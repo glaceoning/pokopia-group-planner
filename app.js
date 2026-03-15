@@ -22,8 +22,11 @@ const elements = {
   groupList: document.querySelector("#groupList"),
   groupHint: document.querySelector("#groupHint"),
   requiredHabitat: document.querySelector("#requiredHabitat"),
-  requiredSpecialties: document.querySelector("#requiredSpecialties"),
+  requiredSpecialtiesBox: document.querySelector("#requiredSpecialtiesBox"),
   clearSpecialties: document.querySelector("#clearSpecialties"),
+  specialtiesHint: document.querySelector("#specialtiesHint"),
+  importanceRatio: document.querySelector("#importanceRatio"),
+  importanceValue: document.querySelector("#importanceValue"),
   resultCount: document.querySelector("#resultCount"),
   recommend: document.querySelector("#recommend"),
   resultsBody: document.querySelector("#resultsBody"),
@@ -85,6 +88,23 @@ function mapPokemon(raw) {
   };
 }
 
+function getGroupMembers() {
+  return state.groupIds.map((id) => state.pokemonById.get(id)).filter(Boolean);
+}
+
+function getImportanceRatio() {
+  const raw = Number.parseFloat(elements.importanceRatio.value);
+  if (!Number.isFinite(raw)) {
+    return 0;
+  }
+  return Math.max(-1, Math.min(1, raw));
+}
+
+function updateImportanceRatioLabel() {
+  const a = getImportanceRatio();
+  elements.importanceValue.textContent = a.toFixed(2);
+}
+
 function habitatPairScore(candidateHabitat, memberHabitat) {
   if (!candidateHabitat || !memberHabitat) {
     return 0;
@@ -105,12 +125,15 @@ function favoritesOverlapCount(aSet, bSet) {
   return count;
 }
 
-function selectedMultiValues(selectEl) {
-  return [...selectEl.selectedOptions].map((opt) => opt.value).filter(Boolean);
+function getSelectedSpecialtiesNormalized() {
+  const checked = elements.requiredSpecialtiesBox.querySelectorAll("input[type='checkbox']:checked");
+  return [...checked].map((input) => normalizeText(input.value)).filter(Boolean);
 }
 
-function getGroupMembers() {
-  return state.groupIds.map((id) => state.pokemonById.get(id)).filter(Boolean);
+function updateSpecialtiesHint() {
+  const checked = elements.requiredSpecialtiesBox.querySelectorAll("input[type='checkbox']:checked");
+  const names = [...checked].map((input) => input.value);
+  elements.specialtiesHint.textContent = names.length ? `Selected: ${names.join(", ")}` : "Any specialty";
 }
 
 function renderPokemonSelect(list) {
@@ -137,7 +160,7 @@ function renderPokemonSelect(list) {
   elements.pokemonSelect.disabled = false;
   elements.addPokemon.disabled = false;
 
-  if (current && list.some((p) => p.id === current)) {
+  if (current && list.some((pokemon) => pokemon.id === current)) {
     elements.pokemonSelect.value = current;
   }
 }
@@ -161,15 +184,15 @@ function applyPokemonSearchFilter() {
 
 function candidateMatchesRequirements(candidate) {
   const requiredHabitat = elements.requiredHabitat.value;
-  const requiredSpecialties = selectedMultiValues(elements.requiredSpecialties).map(normalizeText);
+  const requiredSpecialties = getSelectedSpecialtiesNormalized();
 
   if (requiredHabitat && candidate.idealHabitatNorm !== normalizeText(requiredHabitat)) {
     return false;
   }
 
   if (requiredSpecialties.length > 0) {
-    const hasMatch = requiredSpecialties.some((specialty) => candidate.specialtiesNorm.has(specialty));
-    if (!hasMatch) {
+    const hasSpecialtyMatch = requiredSpecialties.some((specialty) => candidate.specialtiesNorm.has(specialty));
+    if (!hasSpecialtyMatch) {
       return false;
     }
   }
@@ -177,25 +200,30 @@ function candidateMatchesRequirements(candidate) {
   return true;
 }
 
-function scoreCandidate(candidate, groupMembers) {
+function scoreCandidate(candidate, groupMembers, importanceRatio) {
   let habitatScore = 0;
   let favoritesScore = 0;
-  let sharedFavoriteTotal = 0;
 
   for (const member of groupMembers) {
     habitatScore += habitatPairScore(candidate.idealHabitatNorm, member.idealHabitatNorm);
-
-    const overlapCount = favoritesOverlapCount(candidate.favoritesNorm, member.favoritesNorm);
-    favoritesScore += overlapCount;
-    sharedFavoriteTotal += overlapCount;
+    favoritesScore += favoritesOverlapCount(candidate.favoritesNorm, member.favoritesNorm);
   }
 
   return {
-    comfortScore: habitatScore + favoritesScore,
+    combinedScore: (1 - importanceRatio) * habitatScore + (1 + importanceRatio) * favoritesScore,
     habitatScore,
     favoritesScore,
-    sharedFavoriteTotal,
   };
+}
+
+function addPokemonById(id) {
+  if (!id || state.groupIds.includes(id) || !state.pokemonById.has(id)) {
+    return;
+  }
+
+  state.groupIds.push(id);
+  renderGroup();
+  runRecommendation();
 }
 
 function renderGroup() {
@@ -220,23 +248,20 @@ function renderGroup() {
     const title = document.createElement("div");
     title.className = "group-title";
     title.textContent = member.label;
-
-    const metaHabitat = document.createElement("div");
-    metaHabitat.className = "group-meta";
-    metaHabitat.innerHTML = `<strong>Ideal Habitat:</strong> ${member.idealHabitat || "Unknown"}`;
-
-    const metaSpecialties = document.createElement("div");
-    metaSpecialties.className = "group-meta";
-    metaSpecialties.innerHTML = `<strong>Specialties:</strong> ${listToText(member.specialties)}`;
-
-    const metaFavorites = document.createElement("div");
-    metaFavorites.className = "group-meta";
-    metaFavorites.innerHTML = `<strong>Favorites:</strong> ${listToText(member.favorites)}`;
+    const habitat = document.createElement("div");
+    habitat.className = "group-meta";
+    habitat.innerHTML = `<strong>Ideal Habitat:</strong> ${member.idealHabitat || "Unknown"}`;
+    const specialties = document.createElement("div");
+    specialties.className = "group-meta";
+    specialties.innerHTML = `<strong>Specialties:</strong> ${listToText(member.specialties)}`;
+    const favorites = document.createElement("div");
+    favorites.className = "group-meta";
+    favorites.innerHTML = `<strong>Favorites:</strong> ${listToText(member.favorites)}`;
 
     info.appendChild(title);
-    info.appendChild(metaHabitat);
-    info.appendChild(metaSpecialties);
-    info.appendChild(metaFavorites);
+    info.appendChild(habitat);
+    info.appendChild(specialties);
+    info.appendChild(favorites);
 
     const removeBtn = document.createElement("button");
     removeBtn.type = "button";
@@ -270,19 +295,34 @@ function populateRequirementSelects() {
   const specialties = unique(state.sortedPokemon.flatMap((pokemon) => pokemon.specialties)).sort((a, b) =>
     a.localeCompare(b),
   );
-  elements.requiredSpecialties.innerHTML = "";
-  for (const specialty of specialties) {
-    const option = document.createElement("option");
-    option.value = specialty;
-    option.textContent = specialty;
-    elements.requiredSpecialties.appendChild(option);
-  }
+  elements.requiredSpecialtiesBox.innerHTML = "";
+
+  specialties.forEach((specialty, index) => {
+    const id = `spec_${index}`;
+    const label = document.createElement("label");
+    label.className = "check-item";
+
+    const input = document.createElement("input");
+    input.type = "checkbox";
+    input.value = specialty;
+    input.id = id;
+
+    const text = document.createElement("span");
+    text.textContent = specialty;
+
+    label.appendChild(input);
+    label.appendChild(text);
+    elements.requiredSpecialtiesBox.appendChild(label);
+  });
+
+  updateSpecialtiesHint();
 }
 
 function runRecommendation() {
   const groupMembers = getGroupMembers();
   const groupSet = new Set(state.groupIds);
   const limit = Number(elements.resultCount.value);
+  const importanceRatio = getImportanceRatio();
 
   const rows = [];
 
@@ -294,7 +334,7 @@ function runRecommendation() {
       continue;
     }
 
-    const score = scoreCandidate(candidate, groupMembers);
+    const score = scoreCandidate(candidate, groupMembers, importanceRatio);
 
     const sharedFavoriteNames = unique(
       groupMembers.flatMap((member) => candidate.favorites.filter((fav) => member.favoritesNorm.has(normalizeText(fav)))),
@@ -309,8 +349,8 @@ function runRecommendation() {
   }
 
   rows.sort((a, b) => {
-    if (b.comfortScore !== a.comfortScore) {
-      return b.comfortScore - a.comfortScore;
+    if (b.combinedScore !== a.combinedScore) {
+      return b.combinedScore - a.combinedScore;
     }
     if (b.habitatScore !== a.habitatScore) {
       return b.habitatScore - a.habitatScore;
@@ -318,8 +358,8 @@ function runRecommendation() {
     if (b.favoritesScore !== a.favoritesScore) {
       return b.favoritesScore - a.favoritesScore;
     }
-    if (b.sharedFavoriteTotal !== a.sharedFavoriteTotal) {
-      return b.sharedFavoriteTotal - a.sharedFavoriteTotal;
+    if (b.sharedFavoriteNames.length !== a.sharedFavoriteNames.length) {
+      return b.sharedFavoriteNames.length - a.sharedFavoriteNames.length;
     }
     return a.candidate.label.localeCompare(b.candidate.label);
   });
@@ -333,11 +373,12 @@ function runRecommendation() {
       <td>${index + 1}</td>
       <td>${row.candidate.label}</td>
       <td>${row.candidate.idealHabitat || "Unknown"}</td>
-      <td><strong>${row.comfortScore}</strong></td>
+      <td><strong>${row.combinedScore.toFixed(2)}</strong></td>
       <td>${row.habitatScore}</td>
       <td>${row.favoritesScore}</td>
       <td>${row.sharedFavoriteNames.length ? row.sharedFavoriteNames.join(", ") : "-"}</td>
       <td>${row.notes}</td>
+      <td><button type="button" class="tiny add-from-rec" data-id="${row.candidate.id}">Add</button></td>
     `;
     elements.resultsBody.appendChild(tr);
   }
@@ -346,25 +387,15 @@ function runRecommendation() {
 }
 
 function addSelectedPokemon() {
-  const selectedId = elements.pokemonSelect.value;
-  if (!selectedId) {
-    return;
-  }
-
-  if (state.groupIds.includes(selectedId)) {
-    elements.groupHint.textContent = "That Pokemon is already in the group.";
-    return;
-  }
-
-  state.groupIds.push(selectedId);
-  renderGroup();
-  runRecommendation();
+  addPokemonById(elements.pokemonSelect.value);
 }
 
 function clearSpecialtiesSelection() {
-  for (const option of elements.requiredSpecialties.options) {
-    option.selected = false;
-  }
+  const checked = elements.requiredSpecialtiesBox.querySelectorAll("input[type='checkbox']:checked");
+  checked.forEach((input) => {
+    input.checked = false;
+  });
+  updateSpecialtiesHint();
   runRecommendation();
 }
 
@@ -400,7 +431,20 @@ async function init() {
       renderGroup();
       runRecommendation();
     });
+
     elements.recommend.addEventListener("click", runRecommendation);
+    elements.requiredHabitat.addEventListener("change", runRecommendation);
+    elements.resultCount.addEventListener("change", runRecommendation);
+    elements.importanceRatio.addEventListener("input", () => {
+      updateImportanceRatioLabel();
+      runRecommendation();
+    });
+
+    elements.clearSpecialties.addEventListener("click", clearSpecialtiesSelection);
+    elements.requiredSpecialtiesBox.addEventListener("change", () => {
+      updateSpecialtiesHint();
+      runRecommendation();
+    });
 
     elements.pokemonSearch.addEventListener("input", applyPokemonSearchFilter);
     elements.pokemonSearch.addEventListener("keydown", (event) => {
@@ -410,12 +454,16 @@ async function init() {
       }
     });
 
-    elements.requiredHabitat.addEventListener("change", runRecommendation);
-    elements.requiredSpecialties.addEventListener("change", runRecommendation);
-    elements.clearSpecialties.addEventListener("click", clearSpecialtiesSelection);
-    elements.resultCount.addEventListener("change", runRecommendation);
+    elements.resultsBody.addEventListener("click", (event) => {
+      const button = event.target.closest("button.add-from-rec");
+      if (!button) {
+        return;
+      }
+      addPokemonById(button.dataset.id);
+    });
 
     elements.status.textContent = `${state.pokemon.length} Pokemon loaded.`;
+    updateImportanceRatioLabel();
   } catch (error) {
     console.error(error);
     elements.status.textContent = "Failed to load data. Start a local server and refresh.";

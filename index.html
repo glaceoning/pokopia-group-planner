@@ -10,9 +10,9 @@
     <main class="app">
       <header class="hero">
         <p class="eyebrow">Pokopia Group Planner</p>
-        <h1>Build A Group, Then Get Add Recommendations</h1>
+        <h1>Pokopia Group Recommender</h1>
         <p class="subtitle">
-          Recommendations are ranked by comfort-focused score using only <strong>Ideal Habitat</strong> and
+          Recommendations are ranked by a <strong>combined score</strong> using <strong>Ideal Habitat</strong> and
           <strong>Favorites</strong>.
         </p>
       </header>
@@ -24,17 +24,15 @@
             <button id="clearGroup" type="button" class="ghost">Clear Group</button>
           </div>
 
-          <label class="field" for="pokemonSearch">
-            <span>Find Pokemon By Name Or Dex Number</span>
-            <input id="pokemonSearch" type="text" placeholder="Examples: pidgey, 011, #11" />
-          </label>
-
-          <div class="inline-form">
+          <div class="search-add">
+            <label class="sr-only" for="pokemonSearch">Find Pokemon</label>
+            <input id="pokemonSearch" type="text" placeholder="Search name or dex" />
             <label class="sr-only" for="pokemonSelect">Pokemon</label>
             <select id="pokemonSelect"></select>
             <button id="addPokemon" type="button">Add Pokemon</button>
           </div>
 
+          <p class="hint tiny-text">Search filters the dropdown list.</p>
           <p id="groupHint" class="hint" aria-live="polite"></p>
 
           <ul id="groupList" class="group-list"></ul>
@@ -50,10 +48,11 @@
 
           <div class="field">
             <div class="field-head">
-              <span>Required Specialty (any selected)</span>
+              <span>Required Specialties (A OR B OR C)</span>
               <button id="clearSpecialties" class="tiny ghost" type="button">Clear</button>
             </div>
-            <select id="requiredSpecialties" multiple size="8"></select>
+            <div id="requiredSpecialtiesBox" class="check-grid"></div>
+            <p id="specialtiesHint" class="hint tiny-text">Any specialty</p>
           </div>
 
           <label class="field" for="resultCount">
@@ -66,11 +65,25 @@
             </select>
           </label>
 
+          <div class="field">
+            <span>Importance Ratio</span>
+            <div class="ratio-head">
+              <span>Habitat</span>
+              <output id="importanceValue" class="ratio-value">0.00</output>
+              <span>Favorites</span>
+            </div>
+            <input id="importanceRatio" type="range" min="-1" max="1" step="0.01" value="0" />
+            <div class="ratio-ticks">
+              <span>-1</span>
+              <span>0</span>
+              <span>+1</span>
+            </div>
+          </div>
+
           <button id="recommend" type="button">Recommend Pokemon</button>
 
           <p class="hint small">
-            Scoring: per existing group member, habitat is <code>+1/0/-1</code>, favorites is <code>+n</code> where
-            <code>n</code> is the number of shared favorites.
+            Combined score uses weighted habitat and favorites scores based on the slider.
           </p>
         </article>
       </section>
@@ -88,11 +101,12 @@
                 <th>Rank</th>
                 <th>Pokemon</th>
                 <th>Ideal Habitat</th>
-                <th>Comfort Score</th>
+                <th>Combined Score</th>
                 <th>Habitat Score</th>
                 <th>Favorites Score</th>
                 <th>Shared Favorites</th>
                 <th>Notes</th>
+                <th>Action</th>
               </tr>
             </thead>
             <tbody id="resultsBody"></tbody>
@@ -101,15 +115,20 @@
       </section>
 
       <section class="panel">
-        <h2>Scoring Notes</h2>
+        <h2>How Scores Work</h2>
         <ul class="notes">
           <li>
-            Habitat compatibility map currently used: <code>Bright↔Dark</code>, <code>Humid↔Dry</code>,
-            <code>Warm↔Cool</code> are incompatible.
+            For each existing group member: habitat contributes <code>+1</code> if ideal habitat matches,
+            <code>-1</code> if habitat is in conflict (i.e. dark, bright), and <code>0</code> otherwise.
           </li>
           <li>
-            Suggested improvement later: keep comfort score as-is, and use specialty synergy only as a tie-breaker
-            (not part of comfort).
+            Favorites contribute <code>+n</code> where <code>n</code> is the number of shared favorites with that
+            member.
+          </li>
+          <li>
+            Let slider value be <code>a</code> (from <code>-1</code> to <code>+1</code>):
+            <code>combined = (1 - a) * habitat_score + (1 + a) * favorites_score</code>.
+            We may update this formula later as game mechanics become clearer.
           </li>
         </ul>
       </section>

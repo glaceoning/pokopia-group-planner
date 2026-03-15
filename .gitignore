@@ -1,0 +1,17 @@
+# macOS
+.DS_Store
+
+# Python env/cache
+.venv/
+__pycache__/
+*.pyc
+
+# local tooling
+.claude/
+
+# local scrape/debug outputs
+tmp/
+
+# editor
+.vscode/
+.idea/
