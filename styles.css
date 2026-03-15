@@ -1,0 +1,269 @@
+@import url('https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap');
+
+:root {
+  --bg-top: #f6f2ea;
+  --bg-bottom: #d9e8cf;
+  --panel: rgba(255, 255, 255, 0.9);
+  --ink: #1e2a1f;
+  --muted: #4a5b4d;
+  --border: #c2d9b6;
+  --accent: #2f7d4d;
+  --accent-2: #4da66a;
+  --danger: #ad3d3d;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: 'Sora', system-ui, sans-serif;
+  color: var(--ink);
+  background:
+    radial-gradient(circle at 90% 0%, #ffe4bc 0, transparent 35%),
+    radial-gradient(circle at 8% 12%, #d9e7ff 0, transparent 30%),
+    linear-gradient(160deg, var(--bg-top), var(--bg-bottom));
+  min-height: 100vh;
+}
+
+.app {
+  width: min(1180px, 92vw);
+  margin: 1.5rem auto 2.8rem;
+  display: grid;
+  gap: 0.9rem;
+}
+
+.hero {
+  padding: 0.2rem 0;
+}
+
+.eyebrow {
+  margin: 0;
+  font-size: 0.75rem;
+  font-family: 'IBM Plex Mono', monospace;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+h1 {
+  margin: 0.24rem 0 0;
+  font-size: clamp(1.6rem, 3.5vw, 2.5rem);
+  line-height: 1.08;
+}
+
+.subtitle {
+  margin: 0.55rem 0 0;
+  max-width: 72ch;
+  color: var(--muted);
+}
+
+.grid.two-up {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.9rem;
+}
+
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 0.9rem;
+  box-shadow: 0 10px 28px rgba(30, 42, 31, 0.12);
+}
+
+.panel h2 {
+  margin: 0;
+  font-size: 1.02rem;
+}
+
+.panel-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.6rem;
+  margin-bottom: 0.65rem;
+}
+
+.inline-form {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.55rem;
+  margin-bottom: 0.4rem;
+}
+
+.field {
+  display: grid;
+  gap: 0.35rem;
+  margin-bottom: 0.55rem;
+}
+
+.field-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.field span,
+.field-head span {
+  font-size: 0.84rem;
+  font-weight: 600;
+}
+
+input,
+select,
+button {
+  font: inherit;
+  color: inherit;
+  border-radius: 10px;
+}
+
+input,
+select {
+  border: 1px solid var(--border);
+  background: #fff;
+  padding: 0.5rem 0.6rem;
+}
+
+select[multiple] {
+  min-height: 9rem;
+}
+
+button {
+  border: none;
+  background: linear-gradient(130deg, var(--accent), var(--accent-2));
+  color: #fff;
+  padding: 0.52rem 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+button:hover {
+  filter: brightness(1.04);
+}
+
+button.ghost {
+  background: #fff;
+  color: var(--danger);
+  border: 1px solid #e6b9b9;
+  font-weight: 600;
+  padding: 0.34rem 0.6rem;
+}
+
+button.tiny {
+  padding: 0.2rem 0.5rem;
+  font-size: 0.76rem;
+}
+
+.group-list {
+  list-style: none;
+  padding: 0;
+  margin: 0.55rem 0 0;
+  display: grid;
+  gap: 0.42rem;
+}
+
+.group-item {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.55rem 0.6rem;
+  display: flex;
+  justify-content: space-between;
+  gap: 0.7rem;
+  align-items: flex-start;
+  background: #fff;
+}
+
+.group-info {
+  min-width: 0;
+}
+
+.group-title {
+  font-weight: 700;
+  margin-bottom: 0.15rem;
+}
+
+.group-item button {
+  padding: 0.26rem 0.46rem;
+  border: 1px solid #f0c0c0;
+  background: #fff;
+  color: var(--danger);
+  font-size: 0.79rem;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.group-meta {
+  color: var(--muted);
+  font-size: 0.78rem;
+  margin-top: 0.12rem;
+  word-break: break-word;
+}
+
+.table-wrap {
+  overflow: auto;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 860px;
+}
+
+th,
+td {
+  text-align: left;
+  padding: 0.45rem 0.55rem;
+  border-bottom: 1px solid #e4eee0;
+  vertical-align: top;
+  font-size: 0.85rem;
+}
+
+th {
+  font-size: 0.78rem;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: #35533f;
+}
+
+code {
+  font-family: 'IBM Plex Mono', monospace;
+}
+
+.hint {
+  color: var(--muted);
+  margin: 0;
+  font-size: 0.84rem;
+}
+
+.hint.small {
+  margin-top: 0.5rem;
+  font-size: 0.78rem;
+}
+
+.notes {
+  margin: 0.5rem 0 0;
+  padding-left: 1rem;
+  color: var(--muted);
+  display: grid;
+  gap: 0.3rem;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  border: 0;
+}
+
+@media (max-width: 930px) {
+  .grid.two-up {
+    grid-template-columns: 1fr;
+  }
+}
