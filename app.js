@@ -62,6 +62,13 @@ function listToText(values) {
   return values.length ? values.join(", ") : "-";
 }
 
+function formatRecommendationSpecialties(values) {
+  const cleaned = unique(values)
+    .map((value) => String(value).trim())
+    .filter((value) => value && normalizeText(value) !== "no group members yet");
+  return cleaned.length ? cleaned.join(", ") : "-";
+}
+
 function mapPokemon(raw) {
   const specialties = unique(Array.isArray(raw.specialties) ? raw.specialties : []);
   const favorites = unique(Array.isArray(raw.favorites) ? raw.favorites : []);
@@ -376,7 +383,7 @@ function runRecommendation() {
       <td>${row.habitatScore}</td>
       <td>${row.favoritesScore}</td>
       <td>${row.sharedFavoriteNames.length ? row.sharedFavoriteNames.join(", ") : "-"}</td>
-      <td>${row.candidate.specialties.length ? row.candidate.specialties.join(", ") : "-"}</td>
+      <td>${formatRecommendationSpecialties(row.candidate.specialties)}</td>
       <td><button type="button" class="tiny add-from-rec" data-id="${row.candidate.id}">Add</button></td>
     `;
     elements.resultsBody.appendChild(tr);
