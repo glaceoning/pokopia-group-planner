@@ -64,8 +64,7 @@ function listToText(values) {
 
 function formatRecommendationSpecialties(values) {
   const cleaned = unique(values)
-    .map((value) => String(value).trim())
-    .filter((value) => value && normalizeText(value) !== "no group members yet");
+    .map((value) => String(value).trim());
   return cleaned.length ? cleaned.join(", ") : "-";
 }
 
