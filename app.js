@@ -344,7 +344,6 @@ function runRecommendation() {
       candidate,
       ...score,
       sharedFavoriteNames,
-      notes: groupMembers.length ? "-" : "No group members yet",
     });
   }
 
@@ -372,12 +371,11 @@ function runRecommendation() {
     tr.innerHTML = `
       <td>${index + 1}</td>
       <td>${row.candidate.label}</td>
-      <td>${row.candidate.idealHabitat || "Unknown"}</td>
       <td><strong>${row.combinedScore.toFixed(2)}</strong></td>
       <td>${row.habitatScore}</td>
       <td>${row.favoritesScore}</td>
       <td>${row.sharedFavoriteNames.length ? row.sharedFavoriteNames.join(", ") : "-"}</td>
-      <td>${row.notes}</td>
+      <td>${row.candidate.specialties.length ? row.candidate.specialties.join(", ") : "-"}</td>
       <td><button type="button" class="tiny add-from-rec" data-id="${row.candidate.id}">Add</button></td>
     `;
     elements.resultsBody.appendChild(tr);
