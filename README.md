@@ -10,16 +10,9 @@ python3 -m http.server 8000
 
 Open: <http://localhost:8000>
 
-## Main flow
 
-1. Search Pokemon by name or dex number, then add to current group.
-2. Set recommendation requirements:
-- required ideal habitat
-- required specialties using checkbox multi-select (`A OR B OR C` matching)
-- importance ratio slider (`a`) from `-1` (habitat-heavy) to `+1` (favorites-heavy)
-3. View ranked recommendations and add directly from the results table.
 
-## Current combined score (implemented)
+## Current combined score
 
 For each candidate against each existing group member:
 
@@ -33,6 +26,27 @@ Then apply:
 The UI shows combined score to 2 decimal places.
 
 This formula is intentionally simple for now and may be updated later.
+
+## Group total scores
+
+Group total score is computed from the current group only (not candidates), with two modes:
+
+- `stacked` overlap mode:
+  - For a shared feature with `k` Pokemon, contribution is `1 + 2 + ... + (k - 1)` (equivalent to pairwise count).
+  - Example: `k = 3 -> 3`, `k = 4 -> 6`.
+- `simple` overlap mode:
+  - For a shared feature with `k` Pokemon, contribution is `k - 1`.
+  - Example: `k = 3 -> 2`, `k = 4 -> 3`.
+
+Conflicting Ideal Habitat is subtracted as `-1` per conflicting pair in both modes.
+
+Combined group total uses the same slider weighting:
+
+`group_total = (1 - a) * habitat_total + (1 + a) * favorites_total`
+
+The app shows both totals at the same time.
+
+
 
 ## Data
 

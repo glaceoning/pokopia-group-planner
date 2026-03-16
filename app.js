@@ -1,4 +1,4 @@
-const HABITAT_INCOMPATIBLE = new Set([
+const HABITAT_CONFLICTING = new Set([
   "bright|dark",
   "dark|bright",
   "humid|dry",
@@ -12,6 +12,7 @@ const state = {
   sortedPokemon: [],
   pokemonById: new Map(),
   groupIds: [],
+  groupOverlapVisible: false,
 };
 
 const elements = {
@@ -21,6 +22,14 @@ const elements = {
   clearGroup: document.querySelector("#clearGroup"),
   groupList: document.querySelector("#groupList"),
   groupHint: document.querySelector("#groupHint"),
+  groupTotalStacked: document.querySelector("#groupTotalStacked"),
+  groupTotalSimple: document.querySelector("#groupTotalSimple"),
+  toggleOverlap: document.querySelector("#toggleOverlap"),
+  groupOverlapPanel: document.querySelector("#groupOverlapPanel"),
+  habitatOverlapMeta: document.querySelector("#habitatOverlapMeta"),
+  habitatOverlapList: document.querySelector("#habitatOverlapList"),
+  favoritesOverlapMeta: document.querySelector("#favoritesOverlapMeta"),
+  favoritesOverlapList: document.querySelector("#favoritesOverlapList"),
   requiredHabitat: document.querySelector("#requiredHabitat"),
   requiredSpecialtiesBox: document.querySelector("#requiredSpecialtiesBox"),
   clearSpecialties: document.querySelector("#clearSpecialties"),
@@ -28,7 +37,6 @@ const elements = {
   importanceRatio: document.querySelector("#importanceRatio"),
   importanceValue: document.querySelector("#importanceValue"),
   resultCount: document.querySelector("#resultCount"),
-  recommend: document.querySelector("#recommend"),
   resultsBody: document.querySelector("#resultsBody"),
   status: document.querySelector("#status"),
 };
@@ -118,7 +126,7 @@ function habitatPairScore(candidateHabitat, memberHabitat) {
   if (candidateHabitat === memberHabitat) {
     return 1;
   }
-  return HABITAT_INCOMPATIBLE.has(`${candidateHabitat}|${memberHabitat}`) ? -1 : 0;
+  return HABITAT_CONFLICTING.has(`${candidateHabitat}|${memberHabitat}`) ? -1 : 0;
 }
 
 function favoritesOverlapCount(aSet, bSet) {
@@ -131,9 +139,184 @@ function favoritesOverlapCount(aSet, bSet) {
   return count;
 }
 
+function stackedOverlapScoreFromCount(count) {
+  return count > 1 ? (count * (count - 1)) / 2 : 0;
+}
+
+function simpleOverlapScoreFromCount(count) {
+  return count > 1 ? count - 1 : 0;
+}
+
+function countFeatureOverlap(groupMembers, valuesForMember) {
+  const byFeature = new Map();
+
+  for (const member of groupMembers) {
+    const seenForMember = new Set();
+    for (const raw of valuesForMember(member)) {
+      const label = String(raw ?? "").trim();
+      const norm = normalizeText(label);
+      if (!norm || seenForMember.has(norm)) {
+        continue;
+      }
+      seenForMember.add(norm);
+
+      let entry = byFeature.get(norm);
+      if (!entry) {
+        entry = { label, count: 0, members: [] };
+        byFeature.set(norm, entry);
+      }
+
+      entry.count += 1;
+      entry.members.push(member.label);
+    }
+  }
+
+  return byFeature;
+}
+
+function buildOverlapRows(byFeature) {
+  return [...byFeature.values()]
+    .filter((entry) => entry.count > 1)
+    .sort((a, b) => {
+      if (b.count !== a.count) {
+        return b.count - a.count;
+      }
+      return a.label.localeCompare(b.label);
+    });
+}
+
+function computeHabitatOverlapSummary(groupMembers) {
+  const byHabitat = countFeatureOverlap(groupMembers, (member) => [member.idealHabitat]);
+
+  let stackedPositive = 0;
+  let simplePositive = 0;
+  for (const entry of byHabitat.values()) {
+    stackedPositive += stackedOverlapScoreFromCount(entry.count);
+    simplePositive += simpleOverlapScoreFromCount(entry.count);
+  }
+
+  let conflictPairs = 0;
+  for (let i = 0; i < groupMembers.length; i += 1) {
+    for (let j = i + 1; j < groupMembers.length; j += 1) {
+      if (habitatPairScore(groupMembers[i].idealHabitatNorm, groupMembers[j].idealHabitatNorm) < 0) {
+        conflictPairs += 1;
+      }
+    }
+  }
+
+  return {
+    overlapRows: buildOverlapRows(byHabitat),
+    conflictPairs,
+    stackedScore: stackedPositive - conflictPairs,
+    simpleScore: simplePositive - conflictPairs,
+  };
+}
+
+function computeFavoritesOverlapSummary(groupMembers) {
+  const byFavorite = countFeatureOverlap(groupMembers, (member) => member.favorites);
+
+  let stackedScore = 0;
+  let simpleScore = 0;
+  for (const entry of byFavorite.values()) {
+    stackedScore += stackedOverlapScoreFromCount(entry.count);
+    simpleScore += simpleOverlapScoreFromCount(entry.count);
+  }
+
+  return {
+    overlapRows: buildOverlapRows(byFavorite),
+    stackedScore,
+    simpleScore,
+  };
+}
+
+function computeGroupScoreSummary(groupMembers, importanceRatio) {
+  const habitat = computeHabitatOverlapSummary(groupMembers);
+  const favorites = computeFavoritesOverlapSummary(groupMembers);
+
+  return {
+    habitat,
+    favorites,
+    stackedCombined: (1 - importanceRatio) * habitat.stackedScore + (1 + importanceRatio) * favorites.stackedScore,
+    simpleCombined: (1 - importanceRatio) * habitat.simpleScore + (1 + importanceRatio) * favorites.simpleScore,
+  };
+}
+
+function renderOverlapList(listEl, rows, emptyText) {
+  listEl.innerHTML = "";
+
+  if (!rows.length) {
+    const empty = document.createElement("li");
+    empty.className = "overlap-empty";
+    empty.textContent = emptyText;
+    listEl.appendChild(empty);
+    return;
+  }
+
+  for (const row of rows) {
+    const item = document.createElement("li");
+    item.className = "overlap-item";
+
+    const name = document.createElement("strong");
+    name.textContent = row.label;
+
+    const count = document.createElement("span");
+    count.className = "overlap-count";
+    count.textContent = `x${row.count}`;
+
+    const members = document.createElement("div");
+    members.className = "overlap-members";
+    members.textContent = row.members.join(", ");
+
+    item.appendChild(name);
+    item.appendChild(count);
+    item.appendChild(members);
+    listEl.appendChild(item);
+  }
+}
+
+function setOverlapPanelVisibility(visible) {
+  state.groupOverlapVisible = visible;
+  elements.groupOverlapPanel.classList.toggle("hidden", !visible);
+  elements.toggleOverlap.textContent = visible ? "Hide Overlap Details" : "Show Overlap Details";
+  elements.toggleOverlap.setAttribute("aria-expanded", String(visible));
+}
+
+function renderGroupInsights(groupMembers = getGroupMembers()) {
+  const importanceRatio = getImportanceRatio();
+  const summary = computeGroupScoreSummary(groupMembers, importanceRatio);
+  elements.groupTotalStacked.textContent = summary.stackedCombined.toFixed(2);
+  elements.groupTotalSimple.textContent = summary.simpleCombined.toFixed(2);
+
+  renderOverlapList(elements.habitatOverlapList, summary.habitat.overlapRows, "No shared habitat.");
+  renderOverlapList(elements.favoritesOverlapList, summary.favorites.overlapRows, "No shared favorites.");
+
+  const topHabitat = summary.habitat.overlapRows[0];
+  elements.habitatOverlapMeta.textContent = topHabitat
+    ? `Top overlap: ${topHabitat.label} (${topHabitat.count} Pokemon). Conflicting habitat pairs: ${summary.habitat.conflictPairs}.`
+    : `No shared habitat in current group. Conflicting habitat pairs: ${summary.habitat.conflictPairs}.`;
+
+  const topFavorite = summary.favorites.overlapRows[0];
+  elements.favoritesOverlapMeta.textContent = topFavorite
+    ? `Top overlap: ${topFavorite.label} (${topFavorite.count} Pokemon).`
+    : "No shared favorites in current group.";
+
+  const hasMembers = groupMembers.length > 0;
+  elements.toggleOverlap.disabled = !hasMembers;
+  if (!hasMembers && state.groupOverlapVisible) {
+    setOverlapPanelVisibility(false);
+  }
+}
+
 function getSelectedSpecialtiesNormalized() {
   const checked = elements.requiredSpecialtiesBox.querySelectorAll("input[type='checkbox']:checked");
   return [...checked].map((input) => normalizeText(input.value)).filter(Boolean);
+}
+
+function getCurrentRequirements() {
+  return {
+    requiredHabitatNorm: normalizeText(elements.requiredHabitat.value),
+    requiredSpecialtiesNorm: getSelectedSpecialtiesNormalized(),
+  };
 }
 
 function updateSpecialtiesHint() {
@@ -188,16 +371,13 @@ function applyPokemonSearchFilter() {
   renderPokemonSelect(filtered);
 }
 
-function candidateMatchesRequirements(candidate) {
-  const requiredHabitat = elements.requiredHabitat.value;
-  const requiredSpecialties = getSelectedSpecialtiesNormalized();
-
-  if (requiredHabitat && candidate.idealHabitatNorm !== normalizeText(requiredHabitat)) {
+function candidateMatchesRequirements(candidate, requirements) {
+  if (requirements.requiredHabitatNorm && candidate.idealHabitatNorm !== requirements.requiredHabitatNorm) {
     return false;
   }
 
-  if (requiredSpecialties.length > 0) {
-    const hasSpecialtyMatch = requiredSpecialties.some((specialty) => candidate.specialtiesNorm.has(specialty));
+  if (requirements.requiredSpecialtiesNorm.length > 0) {
+    const hasSpecialtyMatch = requirements.requiredSpecialtiesNorm.some((specialty) => candidate.specialtiesNorm.has(specialty));
     if (!hasSpecialtyMatch) {
       return false;
     }
@@ -222,14 +402,44 @@ function scoreCandidate(candidate, groupMembers, importanceRatio) {
   };
 }
 
+function getSharedFavoriteNames(candidate, groupMembers) {
+  return candidate.favorites.filter((favorite) => {
+    const favoriteNorm = normalizeText(favorite);
+    return favoriteNorm && groupMembers.some((member) => member.favoritesNorm.has(favoriteNorm));
+  });
+}
+
+function refreshAfterGroupChange() {
+  renderGroup();
+  runRecommendation();
+}
+
 function addPokemonById(id) {
   if (!id || state.groupIds.includes(id) || !state.pokemonById.has(id)) {
     return;
   }
 
   state.groupIds.push(id);
-  renderGroup();
-  runRecommendation();
+  refreshAfterGroupChange();
+}
+
+function removePokemonById(id) {
+  const nextIds = state.groupIds.filter((groupId) => groupId !== id);
+  if (nextIds.length === state.groupIds.length) {
+    return;
+  }
+
+  state.groupIds = nextIds;
+  refreshAfterGroupChange();
+}
+
+function clearGroup() {
+  if (!state.groupIds.length) {
+    return;
+  }
+
+  state.groupIds = [];
+  refreshAfterGroupChange();
 }
 
 function renderGroup() {
@@ -273,9 +483,7 @@ function renderGroup() {
     removeBtn.type = "button";
     removeBtn.textContent = "Remove";
     removeBtn.addEventListener("click", () => {
-      state.groupIds = state.groupIds.filter((id) => id !== member.id);
-      renderGroup();
-      runRecommendation();
+      removePokemonById(member.id);
     });
 
     li.appendChild(info);
@@ -326,6 +534,7 @@ function populateRequirementSelects() {
 
 function runRecommendation() {
   const groupMembers = getGroupMembers();
+  const requirements = getCurrentRequirements();
   const groupSet = new Set(state.groupIds);
   const limit = Number(elements.resultCount.value);
   const importanceRatio = getImportanceRatio();
@@ -336,20 +545,16 @@ function runRecommendation() {
     if (groupSet.has(candidate.id)) {
       continue;
     }
-    if (!candidateMatchesRequirements(candidate)) {
+    if (!candidateMatchesRequirements(candidate, requirements)) {
       continue;
     }
 
     const score = scoreCandidate(candidate, groupMembers, importanceRatio);
 
-    const sharedFavoriteNames = unique(
-      groupMembers.flatMap((member) => candidate.favorites.filter((fav) => member.favoritesNorm.has(normalizeText(fav)))),
-    );
-
     rows.push({
       candidate,
       ...score,
-      sharedFavoriteNames,
+      sharedFavoriteNames: getSharedFavoriteNames(candidate, groupMembers),
     });
   }
 
@@ -389,6 +594,7 @@ function runRecommendation() {
   }
 
   elements.status.textContent = `${topRows.length} shown out of ${rows.length} matching candidates.`;
+  renderGroupInsights(groupMembers);
 }
 
 function addSelectedPokemon() {
@@ -432,18 +638,19 @@ async function init() {
 
     elements.addPokemon.addEventListener("click", addSelectedPokemon);
     elements.pokemonSelect.addEventListener("change", addSelectedPokemon);
-    elements.clearGroup.addEventListener("click", () => {
-      state.groupIds = [];
-      renderGroup();
-      runRecommendation();
-    });
+    elements.clearGroup.addEventListener("click", clearGroup);
 
-    elements.recommend.addEventListener("click", runRecommendation);
     elements.requiredHabitat.addEventListener("change", runRecommendation);
     elements.resultCount.addEventListener("change", runRecommendation);
     elements.importanceRatio.addEventListener("input", () => {
       updateImportanceRatioLabel();
       runRecommendation();
+    });
+    elements.toggleOverlap.addEventListener("click", () => {
+      if (elements.toggleOverlap.disabled) {
+        return;
+      }
+      setOverlapPanelVisibility(!state.groupOverlapVisible);
     });
 
     elements.clearSpecialties.addEventListener("click", clearSpecialtiesSelection);
@@ -469,6 +676,7 @@ async function init() {
     });
 
     elements.status.textContent = `${state.pokemon.length} Pokemon loaded.`;
+    setOverlapPanelVisibility(false);
     updateImportanceRatioLabel();
   } catch (error) {
     console.error(error);

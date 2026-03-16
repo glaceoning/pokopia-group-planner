@@ -36,6 +36,36 @@
           <p id="groupHint" class="hint" aria-live="polite"></p>
 
           <ul id="groupList" class="group-list"></ul>
+
+          <button id="toggleOverlap" type="button" class="tiny ghost" aria-expanded="false">
+            Show Overlap Details
+          </button>
+
+          <div id="groupOverlapPanel" class="group-overlap hidden">
+            <div class="overlap-grid">
+              <section>
+                <h3>Habitat Overlap</h3>
+                <p id="habitatOverlapMeta" class="hint tiny-text">No shared habitat in current group.</p>
+                <ul id="habitatOverlapList" class="overlap-list"></ul>
+              </section>
+              <section>
+                <h3>Favorites Overlap</h3>
+                <p id="favoritesOverlapMeta" class="hint tiny-text">No shared favorites in current group.</p>
+                <ul id="favoritesOverlapList" class="overlap-list"></ul>
+              </section>
+            </div>
+          </div>
+
+          <div class="group-totals" aria-live="polite">
+            <p class="group-total-primary">
+              <strong>Stacked Total Group Score</strong>:
+              <span id="groupTotalStacked">0.00</span>
+            </p>
+            <p class="group-total-primary">
+              <strong>Simple Total Group Score</strong>:
+              <span id="groupTotalSimple">0.00</span>
+            </p>
+          </div>
         </article>
 
         <article class="panel">
@@ -79,8 +109,6 @@
               <span>+1</span>
             </div>
           </div>
-
-          <button id="recommend" type="button">Recommend Pokemon</button>
 
           <p class="hint small">
             Combined score uses weighted habitat and favorites scores based on the slider.
@@ -129,6 +157,11 @@
             Let slider value be <code>a</code> (from <code>-1</code> to <code>+1</code>):
             <code>combined = (1 - a) * habitat_score + (1 + a) * favorites_score</code>.
             We may update this formula later as game mechanics become clearer.
+          </li>
+          <li>
+            Group totals are shown in two modes: <code>stacked</code> counts full overlap build-up
+            (<code>k - 1 + ... + 1</code>), while <code>simple</code> counts <code>k - 1</code> for
+            <code>k</code> Pokemon sharing a feature. Conflicting habitat pairs subtract <code>1</code> in both modes.
           </li>
         </ul>
       </section>
