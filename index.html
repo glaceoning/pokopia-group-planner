@@ -14,142 +14,76 @@
       <header class="hero panel">
         <div class="hero-copy">
           <p class="eyebrow" id="heroEyebrow">Pokopia Group Planner</p>
-          <h1 id="heroTitle">A complete redesign for building elite Pokopia groups.</h1>
-          <p class="subtitle">
-            Stop wrestling with a confusing giant list. Import the Pokémon you actually own, build from your personal
-            Pokédex, and get sharp recommendations that fit your real collection.
-          </p>
+          <h1 id="heroTitle">Build better Pokopia squads.</h1>
+          <p class="subtitle">Import the Pokémon you own, choose your squad, and compare recommendations.</p>
 
           <div class="hero-actions">
-            <button id="jumpToImport" type="button">Import my Pokédex</button>
-            <button id="jumpToRecommendations" type="button" class="ghost">See recommendations</button>
-          </div>
-
-          <div class="hero-highlights">
-            <article class="highlight-card">
-              <span class="highlight-label">Owned Pokédex</span>
-              <strong id="ownedCountHero">0</strong>
-              <p>Pokémon imported into your personal pool.</p>
-            </article>
-            <article class="highlight-card">
-              <span class="highlight-label">Active squad</span>
-              <strong id="teamCountHero">0</strong>
-              <p>Pokémon currently being optimized together.</p>
-            </article>
-            <article class="highlight-card accent-card">
-              <span class="highlight-label">Recommendation mode</span>
-              <strong id="recommendationModeHero">Owned only</strong>
-              <p>Defaulted to Pokémon you already have, with an optional expand toggle.</p>
-            </article>
+            <button id="jumpToImport" type="button">Import Pokémon</button>
+            <button id="jumpToRecommendations" type="button" class="ghost">View recommendations</button>
           </div>
         </div>
 
-        <div class="hero-side">
-          <section class="hero-side-card">
-            <p class="section-kicker">New workflow</p>
-            <ol class="feature-list ordered">
-              <li>Import or bulk-select the Pokémon you own.</li>
-              <li>Use your owned Pokédex as the only team-building pool.</li>
-              <li>Let recommendations focus on owned Pokémon by default.</li>
-              <li>Flip one toggle if you want to scout unowned options too.</li>
-            </ol>
-          </section>
-
-          <section class="hero-side-card callout-card">
-            <p class="section-kicker">Why this is better</p>
-            <h2>Clear. Focused. Actually enjoyable.</h2>
-            <p class="hint">
-              This overhaul turns the planner into a collection-first dashboard instead of a cluttered wall of choices.
-            </p>
-          </section>
+        <div class="hero-summary">
+          <article class="stat-card">
+            <span class="stat-label">Owned</span>
+            <strong id="ownedCountHero">0</strong>
+            <small>Pokémon in your list</small>
+          </article>
+          <article class="stat-card">
+            <span class="stat-label">Squad</span>
+            <strong id="teamCountHero">0</strong>
+            <small>Pokémon in the active squad</small>
+          </article>
+          <article class="stat-card">
+            <span class="stat-label">Mode</span>
+            <strong id="recommendationModeHero">Owned only</strong>
+            <small>Recommendation pool</small>
+          </article>
         </div>
       </header>
 
-      <section class="top-grid">
-        <article class="panel personal-panel">
-          <div class="section-heading compact">
-            <div>
-              <p class="section-kicker">Identity</p>
-              <h2>Make the planner yours</h2>
-              <p class="section-copy">Save a trainer name, planner title, and notes for your own local setup.</p>
-            </div>
-            <button id="resetPersonalization" type="button" class="ghost tiny">Reset</button>
+      <section class="panel mission-panel">
+        <div class="section-heading compact">
+          <div>
+            <h2>Overview</h2>
           </div>
+          <p id="status" class="hint" aria-live="polite"></p>
+        </div>
 
-          <div class="form-grid two-col">
-            <label class="field" for="trainerName">
-              <span>Trainer name</span>
-              <input id="trainerName" type="text" placeholder="Your trainer name" />
-            </label>
-            <label class="field" for="plannerTitle">
-              <span>Planner title</span>
-              <input id="plannerTitle" type="text" placeholder="Top-tier Pokopia planner" />
-            </label>
+        <div class="stat-grid">
+          <div class="stat-card">
+            <span class="stat-label">Owned</span>
+            <strong id="ownedCountStat">0</strong>
+            <small id="ownedCoverageStat">0% of all Pokopia Pokémon</small>
           </div>
-
-          <label class="field" for="personalNotes">
-            <span>Notes</span>
-            <textarea id="personalNotes" rows="4" placeholder="Track goals, target Pokémon, or team ideas."></textarea>
-          </label>
-
-          <div class="inline-actions">
-            <button id="savePersonalization" type="button">Save details</button>
-            <p id="personalizationStatus" class="hint tiny-text" aria-live="polite">
-              Stored only in this browser on this device.
-            </p>
+          <div class="stat-card">
+            <span class="stat-label">Squad</span>
+            <strong id="teamCountStat">0</strong>
+            <small id="teamSummaryStat">Add Pokémon to start building</small>
           </div>
-        </article>
-
-        <article class="panel mission-panel">
-          <div class="section-heading compact">
-            <div>
-              <p class="section-kicker">Command center</p>
-              <h2>See the whole plan at a glance</h2>
-              <p class="section-copy">The dashboard below updates live as you import, build, and refine.</p>
-            </div>
+          <div class="stat-card">
+            <span class="stat-label">Top score</span>
+            <strong id="topRecommendationScore">—</strong>
+            <small id="topRecommendationName">No recommendation yet</small>
           </div>
-
-          <div class="stat-grid">
-            <div class="stat-card">
-              <span class="stat-label">Owned Pokédex</span>
-              <strong id="ownedCountStat">0</strong>
-              <small id="ownedCoverageStat">0% of all Pokopia Pokémon</small>
-            </div>
-            <div class="stat-card">
-              <span class="stat-label">Active squad</span>
-              <strong id="teamCountStat">0</strong>
-              <small id="teamSummaryStat">Add owned Pokémon to start building</small>
-            </div>
-            <div class="stat-card">
-              <span class="stat-label">Top score</span>
-              <strong id="topRecommendationScore">—</strong>
-              <small id="topRecommendationName">No recommendation yet</small>
-            </div>
-            <div class="stat-card">
-              <span class="stat-label">Current mode</span>
-              <strong id="recommendationModeStat">Owned only</strong>
-              <small id="unownedVisibleStat">Unowned recommendations hidden</small>
-            </div>
+          <div class="stat-card">
+            <span class="stat-label">Mode</span>
+            <strong id="recommendationModeStat">Owned only</strong>
+            <small id="unownedVisibleStat">Unowned hidden</small>
           </div>
+        </div>
 
-          <div class="insight-banner" id="plannerInsight" aria-live="polite">
-            Import your owned Pokémon first so the planner can stop suggesting things you do not actually have.
-          </div>
-        </article>
+        <div class="insight-banner" id="plannerInsight" aria-live="polite">Add owned Pokémon to start building.</div>
       </section>
 
       <section class="panel import-panel" id="importSection">
         <div class="section-heading">
           <div>
-            <p class="section-kicker">Step 1</p>
-            <h2>Build your owned Pokédex</h2>
-            <p class="section-copy">
-              This is now the foundation of the app. Import the Pokémon you own, and they become your personal source
-              pool for team creation and recommendations.
-            </p>
+            <h2>Owned Pokémon</h2>
+            <p class="section-copy">Add Pokémon from the catalog or paste a list.</p>
           </div>
           <div class="toolbar-actions">
-            <button id="clearOwnedDex" type="button" class="ghost">Clear owned Pokédex</button>
+            <button id="clearOwnedDex" type="button" class="ghost">Clear owned list</button>
             <button id="selectAllVisibleCatalog" type="button" class="ghost tiny">Select visible</button>
             <button id="clearVisibleCatalog" type="button" class="ghost tiny">Clear visible</button>
           </div>
@@ -159,8 +93,8 @@
           <section class="glass-card">
             <div class="card-head">
               <div>
-                <h3>Bulk-import from the full catalog</h3>
-                <p class="hint tiny-text">Search the full Pokopia list, mark what you own, then add all of it to your Pokédex.</p>
+                <h3>Catalog</h3>
+                <p class="hint tiny-text">Search and select Pokémon to add.</p>
               </div>
               <p id="catalogSelectionCount" class="pill">0 selected</p>
             </div>
@@ -170,15 +104,15 @@
               <input id="catalogSearch" type="text" placeholder="Example: Pikachu or 025" />
             </label>
 
-            <button id="addCatalogSelection" type="button">Add selected to owned Pokédex</button>
+            <button id="addCatalogSelection" type="button">Add selected</button>
             <div id="catalogList" class="catalog-list" role="group" aria-label="Full Pokémon catalog"></div>
           </section>
 
           <section class="glass-card">
             <div class="card-head">
               <div>
-                <h3>Paste your owned list</h3>
-                <p class="hint tiny-text">One Pokémon per line. Every valid match is automatically added to your owned Pokédex.</p>
+                <h3>Paste list</h3>
+                <p class="hint tiny-text">Use one Pokémon per line.</p>
               </div>
             </div>
 
@@ -189,17 +123,10 @@
 
             <div class="inline-actions wrap-start">
               <button id="readClipboard" type="button" class="ghost">Paste from clipboard</button>
-              <button id="importPokemonList" type="button">Import into owned Pokédex</button>
+              <button id="importPokemonList" type="button">Import list</button>
             </div>
 
-            <p id="importFeedback" class="hint" aria-live="polite">
-              Imported Pokémon become available everywhere else in the planner automatically.
-            </p>
-
-            <div class="mini-note">
-              <strong>Important:</strong>
-              importing now fills your in-app Pokédex first. Your active squad is built from that owned list afterward.
-            </div>
+            <p id="importFeedback" class="hint" aria-live="polite">Imported Pokémon will appear in your owned list below.</p>
           </section>
         </div>
       </section>
@@ -208,9 +135,8 @@
         <article class="panel owned-panel">
           <div class="section-heading compact">
             <div>
-              <p class="section-kicker">Step 2</p>
-              <h2>Choose your squad from your owned Pokédex</h2>
-              <p class="section-copy">No more building from a 300+ Pokémon wall. This panel only shows Pokémon you actually own.</p>
+              <h2>Available owned Pokémon</h2>
+              <p class="section-copy">Choose which owned Pokémon to add to the squad.</p>
             </div>
             <div class="toolbar-actions">
               <button id="clearTeam" type="button" class="ghost">Clear squad</button>
@@ -219,18 +145,18 @@
 
           <div class="owned-toolbar">
             <label class="field grow" for="ownedSearch">
-              <span>Search your owned Pokédex</span>
-              <input id="ownedSearch" type="text" placeholder="Filter your imported Pokémon" />
+              <span>Search owned Pokémon</span>
+              <input id="ownedSearch" type="text" placeholder="Filter your owned Pokémon" />
             </label>
             <div class="segment-info">
-              <span class="segment-label">Owned pool</span>
-              <strong id="ownedSearchSummary">0 available</strong>
+              <span class="segment-label">Available</span>
+              <strong id="ownedSearchSummary">0</strong>
             </div>
           </div>
 
           <div id="ownedDexEmpty" class="empty-state hidden">
-            <h3>Your owned Pokédex is empty</h3>
-            <p>Import your Pokémon first, then come back here to build squads from your real collection.</p>
+            <h3>No owned Pokémon yet</h3>
+            <p>Add Pokémon above to populate this list.</p>
           </div>
 
           <div id="ownedDexList" class="owned-dex-list"></div>
@@ -239,16 +165,15 @@
         <aside class="panel squad-panel">
           <div class="section-heading compact">
             <div>
-              <p class="section-kicker">Step 3</p>
-              <h2>Active squad + synergy</h2>
-              <p class="section-copy">Track what is already in the team and where the overlap is strongest.</p>
+              <h2>Squad</h2>
+              <p class="section-copy">Review the current team and its overlap.</p>
             </div>
-            <button id="toggleOverlap" type="button" class="ghost tiny" aria-expanded="false">Show synergy details</button>
+            <button id="toggleOverlap" type="button" class="ghost tiny" aria-expanded="false">Show overlap</button>
           </div>
 
           <div id="teamEmpty" class="empty-state">
             <h3>No squad yet</h3>
-            <p>Add Pokémon from your owned Pokédex to start optimizing a real team.</p>
+            <p>Add owned Pokémon to start building.</p>
           </div>
 
           <ul id="teamList" class="team-list"></ul>
@@ -257,12 +182,10 @@
             <div class="score-summary-card">
               <span class="score-summary-label">Stacked synergy</span>
               <strong id="groupTotalStacked">0.00</strong>
-              <p class="hint tiny-text">Rewards dense overlap clusters across your current squad.</p>
             </div>
             <div class="score-summary-card">
               <span class="score-summary-label">Simple synergy</span>
               <strong id="groupTotalSimple">0.00</strong>
-              <p class="hint tiny-text">A simpler read on current team compatibility.</p>
             </div>
           </div>
 
@@ -286,14 +209,9 @@
       <section class="panel recommendations-panel" id="recommendationsSection">
         <div class="section-heading compact">
           <div>
-            <p class="section-kicker">Step 4</p>
-            <h2>Recommendations that respect your collection</h2>
-            <p class="section-copy">
-              By default, suggestions are limited to Pokémon in your owned Pokédex. Toggle unowned options on only when
-              you want outside scouting.
-            </p>
+            <h2>Recommendations</h2>
+            <p class="section-copy">Adjust filters and compare candidates for the current squad.</p>
           </div>
-          <p id="status" class="hint"></p>
         </div>
 
         <div class="recommendation-layout">
@@ -305,8 +223,8 @@
               <label class="toggle-card" for="ownedOnlyToggle">
                 <input id="ownedOnlyToggle" type="checkbox" checked />
                 <div>
-                  <strong>Owned Pokédex only</strong>
-                  <p>Default mode. Prioritizes Pokémon you actually have access to.</p>
+                  <strong>Owned only</strong>
+                  <p>Show only Pokémon from your owned list.</p>
                 </div>
               </label>
             </div>
@@ -318,7 +236,7 @@
 
             <div class="field">
               <div class="field-head">
-                <span>Specialties to include</span>
+                <span>Specialties</span>
                 <button id="clearSpecialties" class="tiny ghost" type="button">Clear</button>
               </div>
               <div id="requiredSpecialtiesBox" class="check-grid"></div>
@@ -326,7 +244,7 @@
             </div>
 
             <label class="field" for="resultCount">
-              <span>Results to show</span>
+              <span>Results</span>
               <select id="resultCount">
                 <option value="6">6</option>
                 <option value="10" selected>10</option>
@@ -336,11 +254,11 @@
             </label>
 
             <div class="field">
-              <span>Balance habitat vs. favorites</span>
+              <span>Habitat vs. favorites</span>
               <div class="ratio-head">
-                <span>Habitat focus</span>
+                <span>Habitat</span>
                 <output id="importanceValue" class="ratio-value">0.00</output>
-                <span>Favorites focus</span>
+                <span>Favorites</span>
               </div>
               <input id="importanceRatio" type="range" min="-1" max="1" step="0.01" value="0" />
               <div class="ratio-ticks">
@@ -353,9 +271,9 @@
 
           <div class="results-column">
             <div id="topRecommendationSpotlight" class="spotlight-card hidden">
-              <span class="spotlight-kicker">Best next fit</span>
+              <span class="spotlight-kicker">Top recommendation</span>
               <h3 id="spotlightName">—</h3>
-              <p id="spotlightSummary" class="hint">Build a squad to generate a live recommendation spotlight.</p>
+              <p id="spotlightSummary" class="hint">Build a squad to see the best match.</p>
             </div>
 
             <div class="table-wrap card-surface">
@@ -379,30 +297,6 @@
             </div>
           </div>
         </div>
-      </section>
-
-      <section class="bottom-grid">
-        <article class="panel info-panel">
-          <p class="section-kicker">How this works now</p>
-          <h2>Owned-first planning, finally</h2>
-          <ul class="feature-list">
-            <li>Imported Pokémon are automatically added to your in-app Pokédex.</li>
-            <li>Your owned Pokédex is the default source for squad building.</li>
-            <li>Recommendations default to owned Pokémon and can optionally expand to unowned ones.</li>
-            <li>Unowned recommendations are clearly marked so there is no confusion.</li>
-          </ul>
-        </article>
-
-        <article class="panel info-panel">
-          <p class="section-kicker">Scoring model</p>
-          <h2>Still transparent, now easier to read</h2>
-          <ul class="feature-list">
-            <li>Habitat overlap boosts matching environments and penalizes direct habitat conflicts.</li>
-            <li>Favorites overlap rewards candidates that align with what your squad already likes.</li>
-            <li>The weighting slider lets you decide whether habitat or favorites matters more.</li>
-            <li>Synergy cards and overlap panels show why the squad is or is not coherent.</li>
-          </ul>
-        </article>
       </section>
     </main>
 

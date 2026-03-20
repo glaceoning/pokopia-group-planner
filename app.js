@@ -12,13 +12,6 @@ const STORAGE_KEYS = {
   groupIds: 'pokopia.groupIds',
   ownedIds: 'pokopia.ownedIds',
   requirements: 'pokopia.requirements',
-  personalization: 'pokopia.personalization',
-};
-
-const DEFAULT_PERSONALIZATION = {
-  trainerName: '',
-  plannerTitle: '',
-  personalNotes: '',
 };
 
 const state = {
@@ -31,19 +24,12 @@ const state = {
   filteredCatalogIds: [],
   filteredOwnedIds: [],
   groupOverlapVisible: false,
-  personalization: { ...DEFAULT_PERSONALIZATION },
   lastRecommendationRows: [],
 };
 
 const elements = {
   heroEyebrow: document.querySelector('#heroEyebrow'),
   heroTitle: document.querySelector('#heroTitle'),
-  trainerName: document.querySelector('#trainerName'),
-  plannerTitle: document.querySelector('#plannerTitle'),
-  personalNotes: document.querySelector('#personalNotes'),
-  savePersonalization: document.querySelector('#savePersonalization'),
-  resetPersonalization: document.querySelector('#resetPersonalization'),
-  personalizationStatus: document.querySelector('#personalizationStatus'),
   jumpToImport: document.querySelector('#jumpToImport'),
   jumpToRecommendations: document.querySelector('#jumpToRecommendations'),
   importSection: document.querySelector('#importSection'),
@@ -450,39 +436,6 @@ function saveTeamIds() {
   writeStorage(STORAGE_KEYS.groupIds, state.teamIds);
 }
 
-function applyPersonalization() {
-  const trainerName = String(state.personalization.trainerName || '').trim();
-  const plannerTitle = String(state.personalization.plannerTitle || '').trim();
-
-  elements.trainerName.value = trainerName;
-  elements.plannerTitle.value = plannerTitle;
-  elements.personalNotes.value = String(state.personalization.personalNotes || '');
-  elements.heroEyebrow.textContent = trainerName ? `${trainerName}'s Pokopia HQ` : 'Pokopia Group Planner';
-  elements.heroTitle.textContent = plannerTitle || 'A complete redesign for building elite Pokopia groups.';
-  document.title = plannerTitle || 'Pokopia Group Planner';
-}
-
-function savePersonalization() {
-  state.personalization = {
-    trainerName: String(elements.trainerName.value || '').trim(),
-    plannerTitle: String(elements.plannerTitle.value || '').trim(),
-    personalNotes: String(elements.personalNotes.value || '').trim(),
-  };
-
-  applyPersonalization();
-  const saved = writeStorage(STORAGE_KEYS.personalization, state.personalization);
-  elements.personalizationStatus.textContent = saved
-    ? 'Saved planner details in this browser.'
-    : 'Could not save browser details, but the screen still updated.';
-}
-
-function resetPersonalization() {
-  state.personalization = { ...DEFAULT_PERSONALIZATION };
-  applyPersonalization();
-  const saved = writeStorage(STORAGE_KEYS.personalization, state.personalization);
-  elements.personalizationStatus.textContent = saved ? 'Planner details reset.' : 'Details reset on screen, but storage could not be updated.';
-}
-
 function populateRequirementSelects() {
   const habitats = unique(state.sortedPokemon.map((pokemon) => pokemon.idealHabitat).filter(Boolean)).sort((a, b) =>
     a.localeCompare(b),
@@ -652,7 +605,7 @@ function clearOwnedDex() {
   saveOwnedIds();
   saveTeamIds();
   refreshAllViews();
-  elements.importFeedback.textContent = 'Owned Pokédex cleared. Your active squad was cleared too.';
+  elements.importFeedback.textContent = 'Owned list cleared. Squad cleared too.';
 }
 
 function addPokemonToTeam(id) {
@@ -838,7 +791,8 @@ function updateSpotlight(topRow) {
   elements.topRecommendationScore.textContent = topRow.combinedScore.toFixed(2);
   elements.topRecommendationName.textContent = `${topRow.candidate.label} · ${topRow.owned ? 'Owned' : 'Unowned option'}`;
   elements.spotlightName.textContent = topRow.candidate.label;
-  elements.spotlightSummary.textContent = `${topRow.owned ? 'Owned pick' : 'Outside option'} with habitat ${topRow.candidate.idealHabitat || 'Unknown'}, ${topRow.favoritesScore} favorites overlap points, and shared favorites: ${topRow.sharedFavoriteNames.length ? topRow.sharedFavoriteNames.join(', ') : 'none'}.`;
+  const sharedFavorites = topRow.sharedFavoriteNames.length ? topRow.sharedFavoriteNames.join(', ') : 'none';
+  elements.spotlightSummary.textContent = `${topRow.owned ? 'Owned' : 'Unowned'} · Habitat ${topRow.candidate.idealHabitat || 'Unknown'} · Favorites ${topRow.favoritesScore} · Shared ${sharedFavorites}`;
 }
 
 function runRecommendation() {
@@ -933,23 +887,21 @@ function updateDashboard(topRow, totalMatches) {
   elements.ownedCountStat.textContent = String(ownedCount);
   elements.ownedCoverageStat.textContent = `${coverage}% of all Pokopia Pokémon`;
   elements.teamCountStat.textContent = String(teamCount);
-  elements.teamSummaryStat.textContent = teamCount ? `${teamCount} Pokémon in the current squad` : 'Add owned Pokémon to start building';
-  elements.recommendationModeStat.textContent = ownedOnly ? 'Owned only' : 'Expanded scouting';
-  elements.unownedVisibleStat.textContent = ownedOnly ? 'Unowned recommendations hidden' : 'Unowned recommendations visible';
+  elements.teamSummaryStat.textContent = teamCount ? `${teamCount} Pokémon in squad` : 'Add Pokémon to build a squad';
+  elements.recommendationModeStat.textContent = ownedOnly ? 'Owned only' : 'All Pokémon';
+  elements.unownedVisibleStat.textContent = ownedOnly ? 'Unowned hidden' : 'Unowned visible';
 
   if (!ownedCount) {
-    elements.plannerInsight.textContent = 'Import your owned Pokémon first so the planner can stop suggesting things you do not actually have.';
+    elements.plannerInsight.textContent = 'Add owned Pokémon to start building.';
   } else if (!teamCount) {
-    elements.plannerInsight.textContent = 'Your owned Pokédex is ready. Now build an active squad from that pool to unlock tailored recommendations.';
-  } else if (ownedOnly) {
-    elements.plannerInsight.textContent = `You are seeing ${totalMatches} recommendation candidates from your owned Pokédex only.`;
+    elements.plannerInsight.textContent = 'Choose squad members from your owned list.';
   } else {
-    elements.plannerInsight.textContent = `Expanded mode is active. You are seeing ${totalMatches} candidates from both owned and unowned Pokémon.`;
+    elements.plannerInsight.textContent = `${totalMatches} candidates match the current filters.`;
   }
 
   if (!topRow) {
     elements.topRecommendationScore.textContent = '—';
-    elements.topRecommendationName.textContent = ownedCount ? 'No recommendation matches filters' : 'Import Pokémon to begin';
+    elements.topRecommendationName.textContent = ownedCount ? 'No recommendation matches filters' : 'Add Pokémon to begin';
   }
 }
 
@@ -989,12 +941,12 @@ function importPokemonListFromText(text) {
   const { lines, matchedIds, missing } = parseImportText(text);
 
   if (!lines.length) {
-    elements.importFeedback.textContent = 'Paste at least one Pokémon name before importing.';
+    elements.importFeedback.textContent = 'Paste at least one Pokémon name to import.';
     return;
   }
 
   const added = addOwnedPokemonByIds(matchedIds);
-  const parts = [`Read ${lines.length} lines.`, `Added ${added} Pokémon to your owned Pokédex.`];
+  const parts = [`Read ${lines.length} lines.`, `Added ${added} Pokémon to your owned list.`];
 
   if (missing.length) {
     parts.push(`Could not match: ${missing.join(', ')}.`);
@@ -1040,14 +992,14 @@ function setVisibleCatalogSelection(checked) {
 function addSelectedCatalogPokemon() {
   const ids = [...elements.catalogList.querySelectorAll("input[type='checkbox']:checked")].map((input) => input.value);
   if (!ids.length) {
-    elements.importFeedback.textContent = 'Select Pokémon from the catalog before adding them.';
+    elements.importFeedback.textContent = 'Select Pokémon from the catalog first.';
     return;
   }
 
   const added = addOwnedPokemonByIds(ids);
   elements.importFeedback.textContent = added
-    ? `Added ${added} Pokémon to your owned Pokédex.`
-    : 'Those Pokémon were already in your owned Pokédex.';
+    ? `Added ${added} Pokémon to your owned list.`
+    : 'Those Pokémon were already in your owned list.';
 }
 
 function handleRecommendationAction(button) {
@@ -1057,7 +1009,7 @@ function handleRecommendationAction(button) {
   if (isOwned) {
     const added = addPokemonToTeam(id);
     elements.importFeedback.textContent = added
-      ? 'Added the recommended owned Pokémon to your squad.'
+      ? 'Added the recommended Pokémon to your squad.'
       : 'That Pokémon is already in your squad.';
     return;
   }
@@ -1065,14 +1017,11 @@ function handleRecommendationAction(button) {
   addOwnedPokemonByIds([id]);
   const addedToTeam = addPokemonToTeam(id);
   elements.importFeedback.textContent = addedToTeam
-    ? 'Added the recommended Pokémon to your owned Pokédex and squad.'
-    : 'Added the recommended Pokémon to your owned Pokédex.';
+    ? 'Added the recommended Pokémon to your owned list and squad.'
+    : 'Added the recommended Pokémon to your owned list.';
 }
 
 function bindEvents() {
-  elements.savePersonalization.addEventListener('click', savePersonalization);
-  elements.resetPersonalization.addEventListener('click', resetPersonalization);
-
   elements.jumpToImport.addEventListener('click', () => {
     elements.importSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
   });
@@ -1106,7 +1055,7 @@ function bindEvents() {
     const removeOwnedButton = event.target.closest('button.remove-owned');
     if (removeOwnedButton) {
       removeOwnedPokemonById(removeOwnedButton.dataset.id);
-      elements.importFeedback.textContent = 'Removed Pokémon from your owned Pokédex.';
+      elements.importFeedback.textContent = 'Removed Pokémon from your owned list.';
     }
   });
 
@@ -1150,7 +1099,7 @@ function bindEvents() {
 
 async function init() {
   try {
-    elements.status.textContent = 'Loading Pokopia data…';
+    elements.status.textContent = 'Loading Pokémon data…';
     const response = await fetch('data/pokopia_pokemon.json');
     if (!response.ok) {
       throw new Error(`Data load failed: ${response.status}`);
@@ -1168,12 +1117,6 @@ async function init() {
       return a.name.localeCompare(b.name);
     });
     buildPokemonLookup();
-
-    state.personalization = {
-      ...DEFAULT_PERSONALIZATION,
-      ...readStorage(STORAGE_KEYS.personalization, {}),
-    };
-    applyPersonalization();
     populateRequirementSelects();
     restoreRequirements();
     restoreOwnedIds();
@@ -1183,7 +1126,6 @@ async function init() {
     refreshAllViews();
 
     elements.status.textContent = `${state.pokemon.length} Pokémon loaded.`;
-    elements.personalizationStatus.textContent = 'Planner details, owned Pokédex, squad, and filters are stored only in this browser.';
     setOverlapPanelVisibility(false);
   } catch (error) {
     console.error(error);
