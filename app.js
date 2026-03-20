@@ -7,15 +7,36 @@ const HABITAT_CONFLICTING = new Set([
   "cool|warm",
 ]);
 
+const STORAGE_KEYS = {
+  groupIds: "pokopia.groupIds",
+  requirements: "pokopia.requirements",
+  personalization: "pokopia.personalization",
+};
+
+const DEFAULT_PERSONALIZATION = {
+  trainerName: "",
+  plannerTitle: "",
+  personalNotes: "",
+};
+
 const state = {
   pokemon: [],
   sortedPokemon: [],
   pokemonById: new Map(),
   groupIds: [],
   groupOverlapVisible: false,
+  personalization: { ...DEFAULT_PERSONALIZATION },
 };
 
 const elements = {
+  heroEyebrow: document.querySelector("#heroEyebrow"),
+  heroTitle: document.querySelector("#heroTitle"),
+  trainerName: document.querySelector("#trainerName"),
+  plannerTitle: document.querySelector("#plannerTitle"),
+  personalNotes: document.querySelector("#personalNotes"),
+  savePersonalization: document.querySelector("#savePersonalization"),
+  resetPersonalization: document.querySelector("#resetPersonalization"),
+  personalizationStatus: document.querySelector("#personalizationStatus"),
   pokemonSearch: document.querySelector("#pokemonSearch"),
   pokemonSelect: document.querySelector("#pokemonSelect"),
   addPokemon: document.querySelector("#addPokemon"),
@@ -71,8 +92,7 @@ function listToText(values) {
 }
 
 function formatRecommendationSpecialties(values) {
-  const cleaned = unique(values)
-    .map((value) => String(value).trim());
+  const cleaned = unique(values).map((value) => String(value).trim());
   return cleaned.length ? cleaned.join(", ") : "-";
 }
 
@@ -281,6 +301,112 @@ function setOverlapPanelVisibility(visible) {
   elements.toggleOverlap.setAttribute("aria-expanded", String(visible));
 }
 
+function readStorage(key, fallback) {
+  try {
+    const raw = window.localStorage.getItem(key);
+    return raw ? JSON.parse(raw) : fallback;
+  } catch (error) {
+    console.warn(`Unable to read local storage key: ${key}`, error);
+    return fallback;
+  }
+}
+
+function writeStorage(key, value) {
+  try {
+    window.localStorage.setItem(key, JSON.stringify(value));
+    return true;
+  } catch (error) {
+    console.warn(`Unable to write local storage key: ${key}`, error);
+    return false;
+  }
+}
+
+function applyPersonalization() {
+  const trainerName = String(state.personalization.trainerName || "").trim();
+  const plannerTitle = String(state.personalization.plannerTitle || "").trim();
+
+  elements.trainerName.value = trainerName;
+  elements.plannerTitle.value = plannerTitle;
+  elements.personalNotes.value = String(state.personalization.personalNotes || "");
+
+  elements.heroEyebrow.textContent = trainerName ? `${trainerName}'s Pokopia Planner` : "Pokopia Group Planner";
+  elements.heroTitle.textContent = plannerTitle || "Pokopia Group Recommender";
+  document.title = plannerTitle || "Pokopia Group Planner";
+}
+
+function savePersonalization() {
+  state.personalization = {
+    trainerName: String(elements.trainerName.value || "").trim(),
+    plannerTitle: String(elements.plannerTitle.value || "").trim(),
+    personalNotes: String(elements.personalNotes.value || "").trim(),
+  };
+
+  applyPersonalization();
+  const saved = writeStorage(STORAGE_KEYS.personalization, state.personalization);
+  elements.personalizationStatus.textContent = saved
+    ? "Saved personal settings in this browser."
+    : "Could not save settings in this browser, but your typed values are still shown right now.";
+}
+
+function resetPersonalization() {
+  state.personalization = { ...DEFAULT_PERSONALIZATION };
+  applyPersonalization();
+  const saved = writeStorage(STORAGE_KEYS.personalization, state.personalization);
+  elements.personalizationStatus.textContent = saved
+    ? "Personal settings were reset for this browser."
+    : "Personal settings were cleared on screen, but browser storage could not be updated.";
+}
+
+function saveRequirements() {
+  const checkedSpecialties = [...elements.requiredSpecialtiesBox.querySelectorAll("input[type='checkbox']:checked")].map(
+    (input) => input.value,
+  );
+
+  writeStorage(STORAGE_KEYS.requirements, {
+    requiredHabitat: elements.requiredHabitat.value,
+    selectedSpecialties: checkedSpecialties,
+    resultCount: elements.resultCount.value,
+    importanceRatio: elements.importanceRatio.value,
+  });
+}
+
+function restoreRequirements() {
+  const saved = readStorage(STORAGE_KEYS.requirements, null);
+  if (!saved) {
+    return;
+  }
+
+  if (typeof saved.requiredHabitat === "string") {
+    elements.requiredHabitat.value = saved.requiredHabitat;
+  }
+
+  if (typeof saved.resultCount === "string") {
+    elements.resultCount.value = saved.resultCount;
+  }
+
+  if (typeof saved.importanceRatio === "string") {
+    elements.importanceRatio.value = saved.importanceRatio;
+  }
+
+  const specialties = Array.isArray(saved.selectedSpecialties) ? new Set(saved.selectedSpecialties) : new Set();
+  const boxes = elements.requiredSpecialtiesBox.querySelectorAll("input[type='checkbox']");
+  boxes.forEach((input) => {
+    input.checked = specialties.has(input.value);
+  });
+}
+
+function restoreGroupIds() {
+  const savedIds = readStorage(STORAGE_KEYS.groupIds, []);
+  if (!Array.isArray(savedIds)) {
+    return;
+  }
+  state.groupIds = savedIds.filter((id) => typeof id === "string" && state.pokemonById.has(id));
+}
+
+function saveGroupIds() {
+  writeStorage(STORAGE_KEYS.groupIds, state.groupIds);
+}
+
 function renderGroupInsights(groupMembers = getGroupMembers()) {
   const importanceRatio = getImportanceRatio();
   const summary = computeGroupScoreSummary(groupMembers, importanceRatio);
@@ -420,6 +546,7 @@ function addPokemonById(id) {
   }
 
   state.groupIds.push(id);
+  saveGroupIds();
   refreshAfterGroupChange();
 }
 
@@ -430,6 +557,7 @@ function removePokemonById(id) {
   }
 
   state.groupIds = nextIds;
+  saveGroupIds();
   refreshAfterGroupChange();
 }
 
@@ -439,6 +567,7 @@ function clearGroup() {
   }
 
   state.groupIds = [];
+  saveGroupIds();
   refreshAfterGroupChange();
 }
 
@@ -600,15 +729,14 @@ function runRecommendation() {
       },
     ];
 
-    tr.innerHTML = cells
-      .map(({ label, value }) => `<td data-label="${label}">${value}</td>`)
-      .join("");
+    tr.innerHTML = cells.map(({ label, value }) => `<td data-label="${label}">${value}</td>`).join("");
 
     elements.resultsBody.appendChild(tr);
   }
 
   elements.status.textContent = `${topRows.length} shown out of ${rows.length} matching candidates.`;
   renderGroupInsights(groupMembers);
+  saveRequirements();
 }
 
 function addSelectedPokemon() {
@@ -645,9 +773,19 @@ async function init() {
       return a.name.localeCompare(b.name);
     });
 
+    state.personalization = {
+      ...DEFAULT_PERSONALIZATION,
+      ...readStorage(STORAGE_KEYS.personalization, {}),
+    };
+    applyPersonalization();
+
     populateRequirementSelects();
+    restoreRequirements();
+    restoreGroupIds();
     applyPokemonSearchFilter();
     renderGroup();
+    updateSpecialtiesHint();
+    updateImportanceRatioLabel();
     runRecommendation();
 
     elements.addPokemon.addEventListener("click", addSelectedPokemon);
@@ -673,6 +811,9 @@ async function init() {
       runRecommendation();
     });
 
+    elements.savePersonalization.addEventListener("click", savePersonalization);
+    elements.resetPersonalization.addEventListener("click", resetPersonalization);
+
     elements.pokemonSearch.addEventListener("input", applyPokemonSearchFilter);
     elements.pokemonSearch.addEventListener("keydown", (event) => {
       if (event.key === "Enter") {
@@ -690,8 +831,8 @@ async function init() {
     });
 
     elements.status.textContent = `${state.pokemon.length} Pokemon loaded.`;
+    elements.personalizationStatus.textContent = "Personal settings, your group, and filters are stored only in this browser.";
     setOverlapPanelVisibility(false);
-    updateImportanceRatioLabel();
   } catch (error) {
     console.error(error);
     elements.status.textContent = "Failed to load data. Start a local server and refresh.";

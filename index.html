@@ -9,13 +9,47 @@
   <body>
     <main class="app">
       <header class="hero">
-        <p class="eyebrow">Pokopia Group Planner</p>
-        <h1>Pokopia Group Recommender</h1>
+        <p class="eyebrow" id="heroEyebrow">Pokopia Group Planner</p>
+        <h1 id="heroTitle">Pokopia Group Recommender</h1>
         <p class="subtitle">
           Recommendations are ranked by <strong>Ideal Habitat</strong> and
           <strong>Favorites</strong>. Data scraped from <a href="https://www.serebii.net/pokemonpokopia/">serebii.net</a>
         </p>
       </header>
+
+      <section class="panel personal-setup-panel">
+        <div class="panel-head">
+          <div>
+            <h2>Personal Setup</h2>
+            <p class="hint small no-margin-top">Save your own trainer name, planner title, and notes in this browser.</p>
+          </div>
+          <button id="resetPersonalization" type="button" class="ghost tiny">Reset Personal Setup</button>
+        </div>
+
+        <div class="personal-grid">
+          <label class="field" for="trainerName">
+            <span>Trainer Name</span>
+            <input id="trainerName" type="text" placeholder="Your name or nickname" />
+          </label>
+
+          <label class="field" for="plannerTitle">
+            <span>Planner Title</span>
+            <input id="plannerTitle" type="text" placeholder="My Pokopia Planner" />
+          </label>
+        </div>
+
+        <label class="field" for="personalNotes">
+          <span>Personal Notes</span>
+          <textarea id="personalNotes" rows="3" placeholder="Write anything you want to remember about your own group plans."></textarea>
+        </label>
+
+        <div class="personal-actions">
+          <button id="savePersonalization" type="button">Save Personal Setup</button>
+          <p id="personalizationStatus" class="hint tiny-text" aria-live="polite">
+            Personal settings are stored only in your browser on this device.
+          </p>
+        </div>
+      </section>
 
       <section class="grid two-up">
         <article class="panel current-group-panel">
@@ -142,6 +176,17 @@
             <tbody id="resultsBody"></tbody>
           </table>
         </div>
+      </section>
+
+      <section class="panel quickstart-panel">
+        <h2>How To Use This App</h2>
+        <ol class="notes ordered">
+          <li>Start the local web server for this folder, then open the browser link it prints.</li>
+          <li>Add Pokemon to your current group from the dropdown or from the recommendation table.</li>
+          <li>Use the habitat, specialty, result count, and importance controls to narrow suggestions.</li>
+          <li>Use Personal Setup to save your own title, trainer name, and notes on this device.</li>
+          <li>Your current group and filters are automatically saved in your browser for next time.</li>
+        </ol>
       </section>
 
       <section class="panel">
