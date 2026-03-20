@@ -579,17 +579,31 @@ function runRecommendation() {
 
   for (const [index, row] of topRows.entries()) {
     const tr = document.createElement("tr");
-    tr.innerHTML = `
-      <td>${index + 1}</td>
-      <td>${row.candidate.label}</td>
-      <td>${row.candidate.idealHabitat || "Unknown"}</td>
-      <td><strong>${row.combinedScore.toFixed(2)}</strong></td>
-      <td>${row.habitatScore}</td>
-      <td>${row.favoritesScore}</td>
-      <td>${row.sharedFavoriteNames.length ? row.sharedFavoriteNames.join(", ") : "-"}</td>
-      <td>${formatRecommendationSpecialties(row.candidate.specialties)}</td>
-      <td><button type="button" class="tiny add-from-rec" data-id="${row.candidate.id}">Add</button></td>
-    `;
+    const cells = [
+      { label: "Rank", value: String(index + 1) },
+      { label: "Pokemon", value: row.candidate.label },
+      { label: "Ideal Habitat", value: row.candidate.idealHabitat || "Unknown" },
+      { label: "Combined Score", value: `<strong>${row.combinedScore.toFixed(2)}</strong>` },
+      { label: "Habitat Score", value: String(row.habitatScore) },
+      { label: "Favorites Score", value: String(row.favoritesScore) },
+      {
+        label: "Shared Favorites",
+        value: row.sharedFavoriteNames.length ? row.sharedFavoriteNames.join(", ") : "-",
+      },
+      {
+        label: "Specialties",
+        value: formatRecommendationSpecialties(row.candidate.specialties),
+      },
+      {
+        label: "Action",
+        value: `<button type="button" class="tiny add-from-rec" data-id="${row.candidate.id}">Add</button>`,
+      },
+    ];
+
+    tr.innerHTML = cells
+      .map(({ label, value }) => `<td data-label="${label}">${value}</td>`)
+      .join("");
+
     elements.resultsBody.appendChild(tr);
   }
 
