@@ -51,7 +51,7 @@
         </div>
       </header>
 
-      <section class="panel mission-panel">
+      <section class="panel mission-panel" id="overviewSection" data-mobile-section="overview">
         <div class="section-heading compact">
           <div>
             <h2>Overview</h2>
@@ -95,7 +95,18 @@
         <div class="insight-banner" id="plannerInsight" aria-live="polite">Add owned Pokémon to start building.</div>
       </section>
 
-      <section class="panel import-panel" id="importSection">
+      <nav class="mobile-section-nav" aria-label="Mobile sections">
+        <p class="mobile-section-hint">Quick mobile navigation</p>
+        <div class="mobile-section-track">
+          <button type="button" class="mobile-section-button is-active" data-mobile-target="overview">Overview</button>
+          <button type="button" class="mobile-section-button" data-mobile-target="import">Import</button>
+          <button type="button" class="mobile-section-button" data-mobile-target="squad">Squad</button>
+          <button type="button" class="mobile-section-button" data-mobile-target="houses">Houses</button>
+          <button type="button" class="mobile-section-button" data-mobile-target="recommendations">Recommendations</button>
+        </div>
+      </nav>
+
+      <section class="panel import-panel" id="importSection" data-mobile-section="import">
         <div class="section-heading">
           <div>
             <h2>Owned Pokémon</h2>
@@ -150,7 +161,7 @@
         </div>
       </section>
 
-      <section class="workspace-grid">
+      <section class="workspace-grid" id="workspaceSection" data-mobile-section="squad">
         <article class="panel owned-panel">
           <div class="section-heading compact">
             <div>
@@ -243,7 +254,7 @@
         </aside>
       </section>
 
-      <section class="panel houses-panel" id="housesSection">
+      <section class="panel houses-panel" id="housesSection" data-mobile-section="houses">
         <div class="section-heading">
           <div>
             <h2>Houses</h2>
@@ -306,7 +317,7 @@
         </div>
       </section>
 
-      <section class="panel recommendations-panel" id="recommendationsSection">
+      <section class="panel recommendations-panel" id="recommendationsSection" data-mobile-section="recommendations">
         <div class="section-heading compact">
           <div>
             <h2>Recommendations</h2>
