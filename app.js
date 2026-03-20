@@ -12,9 +12,14 @@ const STORAGE_KEYS = {
   groupIds: 'pokopia.groupIds',
   ownedIds: 'pokopia.ownedIds',
   requirements: 'pokopia.requirements',
+  autoRequirements: 'pokopia.autoRequirements',
   houses: 'pokopia.houses',
   houseCounter: 'pokopia.houseCounter',
 };
+
+const HOUSE_MAPS = ['Withered Wasteland', 'Bleak Beach', 'Rocky Ridges', 'Sparkling Skylands', 'Pallette Town'];
+const HOUSE_SIZE_MIN = 1;
+const HOUSE_SIZE_MAX = 4;
 
 const state = {
   pokemon: [],
@@ -32,6 +37,8 @@ const state = {
   mobileSection: 'overview',
   importCatalogExpanded: false,
   specialtiesExpanded: false,
+  autoFiltersExpanded: false,
+  editingHouseId: null,
 };
 
 const elements = {
@@ -87,10 +94,13 @@ const elements = {
   groupTotalStacked: document.querySelector('#groupTotalStacked'),
   groupTotalSimple: document.querySelector('#groupTotalSimple'),
   houseNameInput: document.querySelector('#houseNameInput'),
+  houseMapInput: document.querySelector('#houseMapInput'),
   saveHouse: document.querySelector('#saveHouse'),
   houseSaveFeedback: document.querySelector('#houseSaveFeedback'),
   clearHouses: document.querySelector('#clearHouses'),
   autoHouseName: document.querySelector('#autoHouseName'),
+  autoHouseMap: document.querySelector('#autoHouseMap'),
+  autoHouseMin: document.querySelector('#autoHouseMin'),
   autoHouseMax: document.querySelector('#autoHouseMax'),
   autoGenerateHouse: document.querySelector('#autoGenerateHouse'),
   autoHouseFeedback: document.querySelector('#autoHouseFeedback'),
@@ -111,6 +121,15 @@ const elements = {
   specialtiesContent: document.querySelector('#specialtiesContent'),
   toggleSpecialties: document.querySelector('#toggleSpecialties'),
   specialtiesHint: document.querySelector('#specialtiesHint'),
+  autoFiltersCard: document.querySelector('#autoFiltersCard'),
+  autoFiltersContent: document.querySelector('#autoFiltersContent'),
+  toggleAutoFilters: document.querySelector('#toggleAutoFilters'),
+  autoRequiredHabitat: document.querySelector('#autoRequiredHabitat'),
+  autoRequiredSpecialtiesBox: document.querySelector('#autoRequiredSpecialtiesBox'),
+  clearAutoSpecialties: document.querySelector('#clearAutoSpecialties'),
+  autoSpecialtiesHint: document.querySelector('#autoSpecialtiesHint'),
+  autoImportanceRatio: document.querySelector('#autoImportanceRatio'),
+  autoImportanceValue: document.querySelector('#autoImportanceValue'),
   resultCount: document.querySelector('#resultCount'),
   importanceRatio: document.querySelector('#importanceRatio'),
   importanceValue: document.querySelector('#importanceValue'),
@@ -332,6 +351,18 @@ function updateImportanceRatioLabel() {
   elements.importanceValue.textContent = getImportanceRatio().toFixed(2);
 }
 
+function getAutoImportanceRatio() {
+  const raw = Number.parseFloat(elements.autoImportanceRatio.value);
+  if (!Number.isFinite(raw)) {
+    return 0;
+  }
+  return Math.max(-1, Math.min(1, raw));
+}
+
+function updateAutoImportanceRatioLabel() {
+  elements.autoImportanceValue.textContent = getAutoImportanceRatio().toFixed(2);
+}
+
 function toggleCollapsible(card, content, toggle, expanded, labels = { expanded: 'Collapse', collapsed: 'Expand' }) {
   if (!card || !content || !toggle) {
     return;
@@ -350,6 +381,10 @@ function syncCatalogCollapse() {
 
 function syncSpecialtiesCollapse() {
   toggleCollapsible(elements.specialtiesCard, elements.specialtiesContent, elements.toggleSpecialties, state.specialtiesExpanded);
+}
+
+function syncAutoFiltersCollapse() {
+  toggleCollapsible(elements.autoFiltersCard, elements.autoFiltersContent, elements.toggleAutoFilters, state.autoFiltersExpanded);
 }
 
 function formatHouseNumber(value) {
@@ -541,6 +576,18 @@ function saveRequirements() {
   });
 }
 
+function saveAutoRequirements() {
+  const checkedSpecialties = [...elements.autoRequiredSpecialtiesBox.querySelectorAll("input[type='checkbox']:checked")].map(
+    (input) => input.value,
+  );
+
+  writeStorage(STORAGE_KEYS.autoRequirements, {
+    requiredHabitat: elements.autoRequiredHabitat.value,
+    selectedSpecialties: checkedSpecialties,
+    importanceRatio: elements.autoImportanceRatio.value,
+  });
+}
+
 function restoreRequirements() {
   const saved = readStorage(STORAGE_KEYS.requirements, null);
   if (!saved) {
@@ -564,6 +611,27 @@ function restoreRequirements() {
   elements.requiredSpecialtiesBox.querySelectorAll("input[type='checkbox']").forEach((input) => {
     input.checked = specialties.has(input.value);
   });
+  updateSpecialtiesHint();
+}
+
+function restoreAutoRequirements() {
+  const saved = readStorage(STORAGE_KEYS.autoRequirements, null);
+  if (!saved) {
+    return;
+  }
+
+  if (typeof saved.requiredHabitat === 'string') {
+    elements.autoRequiredHabitat.value = saved.requiredHabitat;
+  }
+  if (typeof saved.importanceRatio === 'string') {
+    elements.autoImportanceRatio.value = saved.importanceRatio;
+  }
+
+  const specialties = Array.isArray(saved.selectedSpecialties) ? new Set(saved.selectedSpecialties) : new Set();
+  elements.autoRequiredSpecialtiesBox.querySelectorAll("input[type='checkbox']").forEach((input) => {
+    input.checked = specialties.has(input.value);
+  });
+  updateAutoSpecialtiesHint();
 }
 
 function restoreOwnedIds() {
@@ -590,11 +658,12 @@ function sanitizeHouse(raw) {
     id: typeof raw.id === 'string' && raw.id ? raw.id : `house-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     name: String(raw.name || '').trim() || formatHouseNumber(state.houses.length + 1),
     memberIds,
+    map: HOUSE_MAPS.includes(raw.map) ? raw.map : HOUSE_MAPS[0],
     stackedScore: Number.isFinite(raw.stackedScore) ? raw.stackedScore : 0,
     simpleScore: Number.isFinite(raw.simpleScore) ? raw.simpleScore : 0,
     rating: String(raw.rating || '').trim() || 'D',
     createdAt: String(raw.createdAt || new Date().toISOString()),
-    source: raw.source === 'auto' ? 'auto' : 'manual',
+    source: raw.source === 'auto' || raw.source === 'edited' ? raw.source : 'manual',
     sizeRange: raw.sizeRange && typeof raw.sizeRange === 'object' ? raw.sizeRange : null,
     sequence: Number.isInteger(raw.sequence) && raw.sequence > 0 ? raw.sequence : state.houses.length + 1,
   };
@@ -657,15 +726,18 @@ function populateRequirementSelects() {
     a.localeCompare(b),
   );
   elements.requiredHabitat.innerHTML = "<option value=''>Any habitat</option>";
+  elements.autoRequiredHabitat.innerHTML = "<option value=''>Any habitat</option>";
   for (const habitat of habitats) {
     const option = document.createElement('option');
     option.value = habitat;
     option.textContent = habitat;
     elements.requiredHabitat.appendChild(option);
+    elements.autoRequiredHabitat.appendChild(option.cloneNode(true));
   }
 
   const specialties = unique(state.sortedPokemon.flatMap((pokemon) => pokemon.specialties)).sort((a, b) => a.localeCompare(b));
   elements.requiredSpecialtiesBox.innerHTML = '';
+  elements.autoRequiredSpecialtiesBox.innerHTML = '';
 
   specialties.forEach((specialty, index) => {
     const id = `spec_${index}`;
@@ -684,9 +756,16 @@ function populateRequirementSelects() {
     label.appendChild(input);
     label.appendChild(text);
     elements.requiredSpecialtiesBox.appendChild(label);
+
+    const autoLabel = label.cloneNode(true);
+    const autoInput = autoLabel.querySelector('input');
+    autoInput.id = `auto_${id}`;
+    autoLabel.htmlFor = `auto_${id}`;
+    elements.autoRequiredSpecialtiesBox.appendChild(autoLabel);
   });
 
   updateSpecialtiesHint();
+  updateAutoSpecialtiesHint();
 }
 
 function getSelectedSpecialtiesNormalized() {
@@ -702,11 +781,31 @@ function getCurrentRequirements() {
   };
 }
 
+function getSelectedAutoSpecialtiesNormalized() {
+  return [...elements.autoRequiredSpecialtiesBox.querySelectorAll("input[type='checkbox']:checked")]
+    .map((input) => normalizeText(input.value))
+    .filter(Boolean);
+}
+
+function getCurrentAutoRequirements() {
+  return {
+    requiredHabitatNorm: normalizeText(elements.autoRequiredHabitat.value),
+    requiredSpecialtiesNorm: getSelectedAutoSpecialtiesNormalized(),
+  };
+}
+
 function updateSpecialtiesHint() {
   const selected = [...elements.requiredSpecialtiesBox.querySelectorAll("input[type='checkbox']:checked")].map(
     (input) => input.value,
   );
   elements.specialtiesHint.textContent = selected.length ? `Filtering to: ${selected.join(', ')}` : 'Showing all specialties';
+}
+
+function updateAutoSpecialtiesHint() {
+  const selected = [...elements.autoRequiredSpecialtiesBox.querySelectorAll("input[type='checkbox']:checked")].map(
+    (input) => input.value,
+  );
+  elements.autoSpecialtiesHint.textContent = selected.length ? `Filtering to: ${selected.join(', ')}` : 'Showing all specialties';
 }
 
 function getFilteredCatalogPokemon() {
@@ -852,6 +951,7 @@ function clearOwnedDex() {
   state.teamIds = [];
   state.houses = [];
   state.houseCounter = 0;
+  state.editingHouseId = null;
   saveOwnedIds();
   saveTeamIds();
   saveHouses();
@@ -889,6 +989,7 @@ function clearTeam() {
     return;
   }
   state.teamIds = [];
+  state.editingHouseId = null;
   saveTeamIds();
   refreshAllViews();
 }
@@ -951,7 +1052,7 @@ function renderTeam() {
   const members = getTeamMembers();
   elements.teamList.innerHTML = '';
   elements.teamEmpty.classList.toggle('hidden', members.length > 0);
-  elements.saveHouse.disabled = members.length === 0;
+  elements.saveHouse.disabled = members.length === 0 || members.length > HOUSE_SIZE_MAX;
 
   if (!members.length) {
     elements.toggleOverlap.disabled = true;
@@ -979,6 +1080,9 @@ function renderTeam() {
   }
 
   elements.toggleOverlap.disabled = false;
+  if (members.length > HOUSE_SIZE_MAX) {
+    elements.houseSaveFeedback.textContent = `Reduce the active squad to ${HOUSE_SIZE_MAX} Pokémon or fewer before saving a House.`;
+  }
 }
 
 function renderTeamInsights(groupMembers = getTeamMembers()) {
@@ -1138,19 +1242,29 @@ function getHouseDisplayName(house) {
   return house.name || formatHouseNumber(house.sequence || 1);
 }
 
+function getHouseSourceLabel(house) {
+  if (house.source === 'auto') {
+    return 'Auto-generated House';
+  }
+  if (house.source === 'edited') {
+    return 'Edited from a saved House';
+  }
+  return 'Saved from active squad';
+}
+
 function buildDefaultHouseName() {
-  state.houseCounter += 1;
-  saveHouses();
   return formatHouseNumber(state.houseCounter);
 }
 
-function createHouseRecord({ name, memberIds, source, sizeRange }) {
+function createHouseRecord({ name, memberIds, source, sizeRange, map, importanceRatio = getImportanceRatio() }) {
   const members = memberIds.map((id) => state.pokemonById.get(id)).filter(Boolean);
-  const summary = computeGroupScoreSummary(members, getImportanceRatio());
+  const summary = computeGroupScoreSummary(members, importanceRatio);
+  state.houseCounter += 1;
   return {
     id: `house-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     name: String(name || '').trim() || buildDefaultHouseName(),
     memberIds: [...memberIds],
+    map,
     stackedScore: summary.stackedCombined,
     simpleScore: summary.simpleCombined,
     rating: buildHouseRating(summary),
@@ -1161,6 +1275,16 @@ function createHouseRecord({ name, memberIds, source, sizeRange }) {
   };
 }
 
+function validateHouseSize(memberIds) {
+  if (memberIds.length < HOUSE_SIZE_MIN) {
+    return `A House must contain at least ${HOUSE_SIZE_MIN} Pokémon.`;
+  }
+  if (memberIds.length > HOUSE_SIZE_MAX) {
+    return `A House can contain at most ${HOUSE_SIZE_MAX} Pokémon.`;
+  }
+  return '';
+}
+
 function saveCurrentTeamAsHouse() {
   const memberIds = [...state.teamIds];
   if (!memberIds.length) {
@@ -1168,17 +1292,32 @@ function saveCurrentTeamAsHouse() {
     return;
   }
 
+  const sizeError = validateHouseSize(memberIds);
+  if (sizeError) {
+    elements.houseSaveFeedback.textContent = sizeError;
+    return;
+  }
+
+  const selectedMap = elements.houseMapInput.value;
+  if (!HOUSE_MAPS.includes(selectedMap)) {
+    elements.houseSaveFeedback.textContent = 'Choose a House map before saving.';
+    return;
+  }
+
   const house = createHouseRecord({
     name: elements.houseNameInput.value,
     memberIds,
-    source: 'manual',
+    source: state.editingHouseId ? 'edited' : 'manual',
+    map: selectedMap,
   });
 
   state.houses.unshift(house);
   state.teamIds = [];
+  state.editingHouseId = null;
   saveHouses();
   saveTeamIds();
   elements.houseNameInput.value = '';
+  elements.houseMapInput.value = '';
   elements.houseSaveFeedback.textContent = `${getHouseDisplayName(house)} saved. ${house.memberIds.length} Pokémon are now locked into that House.`;
   refreshAllViews();
   setMobileSection('houses', { scroll: true });
@@ -1211,9 +1350,31 @@ function clearHouses() {
   elements.autoHouseFeedback.textContent = 'All Houses released. Their Pokémon are available again.';
 }
 
-function evaluateHouseCandidate(memberIds) {
+function editHouseById(id) {
+  const house = state.houses.find((entry) => entry.id === id);
+  if (!house) {
+    return;
+  }
+
+  if (state.teamIds.length && !window.confirm('Replace the current active squad with this House so you can edit it?')) {
+    return;
+  }
+
+  state.houses = state.houses.filter((entry) => entry.id !== id);
+  state.teamIds = [...house.memberIds];
+  state.editingHouseId = house.id;
+  elements.houseNameInput.value = house.name || '';
+  elements.houseMapInput.value = house.map || HOUSE_MAPS[0];
+  saveHouses();
+  saveTeamIds();
+  refreshAllViews();
+  elements.houseSaveFeedback.textContent = `${getHouseDisplayName(house)} moved back into the active squad. Adjust members, then save it again.`;
+  setMobileSection('squad', { scroll: true });
+}
+
+function evaluateHouseCandidate(memberIds, importanceRatio = getImportanceRatio()) {
   const members = memberIds.map((id) => state.pokemonById.get(id)).filter(Boolean);
-  const summary = computeGroupScoreSummary(members, getImportanceRatio());
+  const summary = computeGroupScoreSummary(members, importanceRatio);
   const habitatRows = summary.habitat.overlapRows.length;
   const favoriteRows = summary.favorites.overlapRows.length;
 
@@ -1248,9 +1409,14 @@ function isBetterHouseCandidate(candidate, incumbent) {
   return compareHouseCandidates(candidate, incumbent) < 0;
 }
 
-function generateBestHouseFromRange(maxSize) {
-  const minSize = 2;
-  const availablePool = getAvailableOwnedPokemon().filter((pokemon) => !state.teamIds.includes(pokemon.id));
+function getFilteredAutoHousePool(requirements) {
+  return getAvailableOwnedPokemon()
+    .filter((pokemon) => !state.teamIds.includes(pokemon.id))
+    .filter((pokemon) => candidateMatchesRequirements(pokemon, requirements));
+}
+
+function generateBestHouseFromRange(minSize, maxSize, requirements, importanceRatio) {
+  const availablePool = getFilteredAutoHousePool(requirements);
   if (availablePool.length < minSize) {
     return null;
   }
@@ -1262,7 +1428,7 @@ function generateBestHouseFromRange(maxSize) {
     const remainingIds = new Set(availablePool.filter((pokemon) => pokemon.id !== seed.id).map((pokemon) => pokemon.id));
 
     if (group.length >= minSize) {
-      const evaluatedSeed = evaluateHouseCandidate(group.map((member) => member.id));
+      const evaluatedSeed = evaluateHouseCandidate(group.map((member) => member.id), importanceRatio);
       if (isBetterHouseCandidate(evaluatedSeed, bestCandidate)) {
         bestCandidate = evaluatedSeed;
       }
@@ -1274,7 +1440,7 @@ function generateBestHouseFromRange(maxSize) {
 
       for (const id of remainingIds) {
         const nextMembers = [...group, state.pokemonById.get(id)].filter(Boolean);
-        const evaluated = evaluateHouseCandidate(nextMembers.map((member) => member.id));
+        const evaluated = evaluateHouseCandidate(nextMembers.map((member) => member.id), importanceRatio);
         if (isBetterHouseCandidate(evaluated, bestNextEvaluation)) {
           bestNextEvaluation = evaluated;
           bestNextId = id;
@@ -1289,7 +1455,7 @@ function generateBestHouseFromRange(maxSize) {
       remainingIds.delete(bestNextId);
 
       if (group.length >= minSize) {
-        const evaluatedGroup = evaluateHouseCandidate(group.map((member) => member.id));
+        const evaluatedGroup = evaluateHouseCandidate(group.map((member) => member.id), importanceRatio);
         if (isBetterHouseCandidate(evaluatedGroup, bestCandidate)) {
           bestCandidate = evaluatedGroup;
         }
@@ -1302,29 +1468,57 @@ function generateBestHouseFromRange(maxSize) {
 
 function normalizeAutoHouseRange() {
   const availableCount = getAvailableOwnedPokemon().filter((pokemon) => !state.teamIds.includes(pokemon.id)).length;
+  let minSize = Number.parseInt(elements.autoHouseMin.value, 10);
   let maxSize = Number.parseInt(elements.autoHouseMax.value, 10);
 
+  if (!Number.isFinite(minSize)) {
+    minSize = HOUSE_SIZE_MIN;
+  }
   if (!Number.isFinite(maxSize)) {
-    maxSize = 4;
+    maxSize = HOUSE_SIZE_MAX;
   }
 
-  maxSize = Math.max(1, Math.min(10, maxSize));
-  maxSize = Math.min(maxSize, availableCount || maxSize);
+  minSize = Math.max(HOUSE_SIZE_MIN, Math.min(HOUSE_SIZE_MAX, minSize));
+  maxSize = Math.max(HOUSE_SIZE_MIN, Math.min(HOUSE_SIZE_MAX, maxSize));
+  if (minSize > maxSize) {
+    [minSize, maxSize] = [maxSize, minSize];
+  }
 
+  minSize = Math.min(minSize, availableCount || minSize);
+  maxSize = Math.min(maxSize, availableCount || maxSize);
+  if (minSize > maxSize) {
+    minSize = maxSize;
+  }
+
+  elements.autoHouseMin.value = String(minSize);
   elements.autoHouseMax.value = String(maxSize);
 
-  return { maxSize, availableCount };
+  return { minSize, maxSize, availableCount };
 }
 
 function generateAutoHouse() {
-  const { maxSize, availableCount } = normalizeAutoHouseRange();
+  const { minSize, maxSize, availableCount } = normalizeAutoHouseRange();
+  const selectedMap = elements.autoHouseMap.value;
+  const requirements = getCurrentAutoRequirements();
+  const importanceRatio = getAutoImportanceRatio();
 
-  if (availableCount < 2) {
-    elements.autoHouseFeedback.textContent = 'At least 2 unassigned owned Pokémon are needed to generate a House.';
+  if (!HOUSE_MAPS.includes(selectedMap)) {
+    elements.autoHouseFeedback.textContent = 'Choose a House map before auto-generating.';
     return;
   }
 
-  const best = generateBestHouseFromRange(maxSize);
+  const filteredPoolCount = getFilteredAutoHousePool(requirements).length;
+  if (filteredPoolCount < minSize) {
+    elements.autoHouseFeedback.textContent = `At least ${minSize} unassigned owned Pokémon must match the current auto-create filters.`;
+    return;
+  }
+
+  if (availableCount < HOUSE_SIZE_MIN) {
+    elements.autoHouseFeedback.textContent = 'At least 1 unassigned owned Pokémon is needed to generate a House.';
+    return;
+  }
+
+  const best = generateBestHouseFromRange(minSize, maxSize, requirements, importanceRatio);
   if (!best) {
     elements.autoHouseFeedback.textContent = 'No valid House could be generated from the current available pool.';
     return;
@@ -1334,13 +1528,17 @@ function generateAutoHouse() {
     name: elements.autoHouseName.value,
     memberIds: best.memberIds,
     source: 'auto',
-    sizeRange: { min: 2, max: maxSize },
+    sizeRange: { min: minSize, max: maxSize },
+    map: selectedMap,
+    importanceRatio,
   });
 
   state.houses.unshift(house);
   saveHouses();
+  saveAutoRequirements();
   elements.autoHouseName.value = '';
-  elements.autoHouseFeedback.textContent = `${getHouseDisplayName(house)} generated with ${house.memberIds.length} Pokémon. Rating ${house.rating}, stacked synergy ${house.stackedScore.toFixed(2)}.`;
+  elements.autoHouseMap.value = '';
+  elements.autoHouseFeedback.textContent = `${getHouseDisplayName(house)} generated with ${house.memberIds.length} Pokémon on ${house.map}. Rating ${house.rating}, stacked synergy ${house.stackedScore.toFixed(2)}.`;
   refreshAllViews();
   setMobileSection('houses', { scroll: true });
 }
@@ -1362,7 +1560,7 @@ function renderHouses() {
     article.innerHTML = `
       <div class="house-card-top">
         <div>
-          <p class="house-card-kicker">${house.source === 'auto' ? 'Auto-generated House' : 'Saved from active squad'}</p>
+          <p class="house-card-kicker">${getHouseSourceLabel(house)}</p>
           <h3>${getHouseDisplayName(house)}</h3>
         </div>
         <div class="house-badge-stack">
@@ -1373,6 +1571,10 @@ function renderHouses() {
 
       <div class="house-score-grid">
         <div class="score-chip">
+          <span>Map</span>
+          <strong>${house.map}</strong>
+        </div>
+        <div class="score-chip">
           <span>Stacked synergy</span>
           <strong>${house.stackedScore.toFixed(2)}</strong>
         </div>
@@ -1382,7 +1584,7 @@ function renderHouses() {
         </div>
       </div>
 
-      <p class="hint tiny-text">${house.sizeRange ? `Generated with a maximum size of ${house.sizeRange.max} (minimum 2). ` : ''}Created ${new Date(house.createdAt).toLocaleString()}.</p>
+      <p class="hint tiny-text">${house.sizeRange ? `Generated with a size range of ${house.sizeRange.min}-${house.sizeRange.max}. ` : ''}Created ${new Date(house.createdAt).toLocaleString()}.</p>
 
       <ul class="house-member-list">
         ${members
@@ -1397,7 +1599,10 @@ function renderHouses() {
           .join('')}
       </ul>
 
-      <button type="button" class="ghost release-house" data-id="${house.id}">Release House</button>
+      <div class="inline-actions wrap-start">
+        <button type="button" class="ghost edit-house" data-id="${house.id}">Edit as active squad</button>
+        <button type="button" class="ghost release-house" data-id="${house.id}">Release House</button>
+      </div>
     `;
     elements.houseList.appendChild(article);
   }
@@ -1520,6 +1725,14 @@ function clearSpecialtiesSelection() {
   });
   updateSpecialtiesHint();
   runRecommendation();
+}
+
+function clearAutoSpecialtiesSelection() {
+  elements.autoRequiredSpecialtiesBox.querySelectorAll("input[type='checkbox']:checked").forEach((input) => {
+    input.checked = false;
+  });
+  updateAutoSpecialtiesHint();
+  saveAutoRequirements();
 }
 
 function addSelectedCatalogPokemon() {
@@ -1645,6 +1858,12 @@ function bindEvents() {
   elements.autoGenerateHouse.addEventListener('click', generateAutoHouse);
   elements.clearHouses.addEventListener('click', clearHouses);
   elements.houseList.addEventListener('click', (event) => {
+    const editButton = event.target.closest('button.edit-house');
+    if (editButton) {
+      editHouseById(editButton.dataset.id);
+      return;
+    }
+
     const releaseButton = event.target.closest('button.release-house');
     if (!releaseButton) {
       return;
@@ -1667,6 +1886,24 @@ function bindEvents() {
   elements.requiredSpecialtiesBox.addEventListener('change', () => {
     updateSpecialtiesHint();
     runRecommendation();
+  });
+
+  elements.toggleAutoFilters.addEventListener('click', () => {
+    state.autoFiltersExpanded = !state.autoFiltersExpanded;
+    syncAutoFiltersCollapse();
+  });
+  elements.clearAutoSpecialties.addEventListener('click', clearAutoSpecialtiesSelection);
+  elements.autoRequiredHabitat.addEventListener('change', saveAutoRequirements);
+  elements.autoRequiredSpecialtiesBox.addEventListener('change', () => {
+    updateAutoSpecialtiesHint();
+    saveAutoRequirements();
+  });
+  elements.autoImportanceRatio.addEventListener('input', () => {
+    updateAutoImportanceRatioLabel();
+    saveAutoRequirements();
+  });
+  [elements.autoHouseMin, elements.autoHouseMax].forEach((input) => {
+    input.addEventListener('change', normalizeAutoHouseRange);
   });
 
   elements.resultsBody.addEventListener('click', (event) => {
@@ -1700,14 +1937,17 @@ async function init() {
     buildPokemonLookup();
     populateRequirementSelects();
     restoreRequirements();
+    restoreAutoRequirements();
     restoreOwnedIds();
     restoreHouseCounter();
     restoreHouses();
     restoreTeamIds();
     updateImportanceRatioLabel();
+    updateAutoImportanceRatioLabel();
     bindEvents();
     syncCatalogCollapse();
     syncSpecialtiesCollapse();
+    syncAutoFiltersCollapse();
     syncMobileSectionVisibility();
     refreshAllViews();
 

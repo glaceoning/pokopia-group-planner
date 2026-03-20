@@ -242,7 +242,7 @@
             <div class="card-head compact-card-head">
               <div>
                 <h3>Save current squad as a House</h3>
-                <p class="hint tiny-text">Saving a House locks these Pokémon together and clears the active squad.</p>
+                <p class="hint tiny-text">Saving a House locks these Pokémon together, assigns a map, and clears the active squad.</p>
               </div>
             </div>
 
@@ -250,6 +250,17 @@
               <label class="field" for="houseNameInput">
                 <span>House name <small class="hint">Optional</small></span>
                 <input id="houseNameInput" type="text" placeholder="Optional nickname" />
+              </label>
+              <label class="field" for="houseMapInput">
+                <span>House map</span>
+                <select id="houseMapInput">
+                  <option value="">Select a map</option>
+                  <option value="Withered Wasteland">Withered Wasteland</option>
+                  <option value="Bleak Beach">Bleak Beach</option>
+                  <option value="Rocky Ridges">Rocky Ridges</option>
+                  <option value="Sparkling Skylands">Sparkling Skylands</option>
+                  <option value="Pallette Town">Pallette Town</option>
+                </select>
               </label>
               <button id="saveHouse" type="button">Save House</button>
             </div>
@@ -289,7 +300,7 @@
             <div class="card-head">
               <div>
                 <h3>Auto-generate a House</h3>
-                <p class="hint tiny-text">Choose a maximum size and let the planner assemble the best available House.</p>
+                <p class="hint tiny-text">Choose a size range, assign a map, and let the planner assemble the best available House.</p>
               </div>
             </div>
 
@@ -299,24 +310,90 @@
                 <input id="autoHouseName" type="text" placeholder="Optional nickname" />
               </label>
 
-              <label class="field" for="autoHouseMax">
-                <span>Maximum size</span>
-                <select id="autoHouseMax">
-                  <option value="2">2 Pokémon</option>
-                  <option value="3">3 Pokémon</option>
-                  <option value="4" selected>4 Pokémon</option>
-                  <option value="5">5 Pokémon</option>
-                  <option value="6">6 Pokémon</option>
-                  <option value="7">7 Pokémon</option>
-                  <option value="8">8 Pokémon</option>
-                  <option value="9">9 Pokémon</option>
-                  <option value="10">10 Pokémon</option>
+              <label class="field" for="autoHouseMap">
+                <span>House map</span>
+                <select id="autoHouseMap">
+                  <option value="">Select a map</option>
+                  <option value="Withered Wasteland">Withered Wasteland</option>
+                  <option value="Bleak Beach">Bleak Beach</option>
+                  <option value="Rocky Ridges">Rocky Ridges</option>
+                  <option value="Sparkling Skylands">Sparkling Skylands</option>
+                  <option value="Pallette Town">Pallette Town</option>
                 </select>
               </label>
 
+              <label class="field" for="autoHouseMin">
+                <span>Minimum size</span>
+                <select id="autoHouseMin">
+                  <option value="1" selected>1 Pokémon</option>
+                  <option value="2">2 Pokémon</option>
+                  <option value="3">3 Pokémon</option>
+                  <option value="4">4 Pokémon</option>
+                </select>
+              </label>
+
+              <label class="field" for="autoHouseMax">
+                <span>Maximum size</span>
+                <select id="autoHouseMax">
+                  <option value="1">1 Pokémon</option>
+                  <option value="2">2 Pokémon</option>
+                  <option value="3">3 Pokémon</option>
+                  <option value="4" selected>4 Pokémon</option>
+                </select>
+              </label>
+
+              <div class="field collapsible-card collapsed auto-filter-card" id="autoFiltersCard">
+                <div class="field-head">
+                  <span>Auto-create filters</span>
+                  <div class="card-head-actions">
+                    <button id="clearAutoSpecialties" class="tiny ghost" type="button">Clear</button>
+                    <button
+                      id="toggleAutoFilters"
+                      class="tiny ghost collapsible-toggle"
+                      type="button"
+                      aria-expanded="false"
+                      aria-controls="autoFiltersContent"
+                    >
+                      Expand
+                    </button>
+                  </div>
+                </div>
+                <div id="autoFiltersContent" class="collapsible-content hidden">
+                  <label class="field" for="autoRequiredHabitat">
+                    <span>Target habitat</span>
+                    <select id="autoRequiredHabitat"></select>
+                  </label>
+
+                  <div class="field collapsible-card expanded nested-filter-card" id="autoSpecialtiesCard">
+                    <div class="field-head">
+                      <span>Specialties</span>
+                    </div>
+                    <div class="collapsible-content">
+                      <div id="autoRequiredSpecialtiesBox" class="check-grid"></div>
+                    </div>
+                    <p id="autoSpecialtiesHint" class="hint tiny-text">Showing all specialties</p>
+                  </div>
+
+                  <div class="field">
+                    <span>Habitat vs. favorites</span>
+                    <div class="ratio-head">
+                      <span>Habitat</span>
+                      <output id="autoImportanceValue" class="ratio-value">0.00</output>
+                      <span>Favorites</span>
+                    </div>
+                    <input id="autoImportanceRatio" type="range" min="-1" max="1" step="0.05" value="0" />
+                    <div class="ratio-ticks hint tiny-text">
+                      <span>Lean habitat</span>
+                      <span>Balanced</span>
+                      <span>Lean favorites</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
               <button id="autoGenerateHouse" type="button">Generate House</button>
               <p id="autoHouseFeedback" class="hint" aria-live="polite">
-                Auto-generation uses your unassigned owned Pokémon and optimizes for overall House synergy up to the selected size.
+                Auto-generation uses your unassigned owned Pokémon and optimizes for overall House synergy within the selected size range.
               </p>
             </div>
           </section>
@@ -325,7 +402,7 @@
             <div class="card-head">
               <div>
                 <h3>Saved Houses</h3>
-                <p class="hint tiny-text">Each House permanently reserves its Pokémon until released.</p>
+                <p class="hint tiny-text">Each House reserves its Pokémon until you release it or move it back into the active squad for editing.</p>
               </div>
               <p id="houseRosterSummary" class="pill">0 Houses</p>
             </div>
