@@ -589,6 +589,15 @@ code {
     width: 100%;
   }
 
+  .personal-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .personal-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
   .group-totals {
     padding: 0.5rem;
   }
@@ -597,4 +606,46 @@ code {
     grid-template-columns: 1fr;
     gap: 0.2rem;
   }
+}
+
+
+.no-margin-top {
+  margin-top: 0;
+}
+
+.personal-setup-panel {
+  display: grid;
+  gap: 0.8rem;
+}
+
+.personal-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+textarea {
+  font: inherit;
+  color: inherit;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: #fff;
+  padding: 0.6rem;
+  resize: vertical;
+  min-height: 5.5rem;
+}
+
+.personal-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.ordered {
+  padding-left: 1.2rem;
+}
+
+.ordered li + li {
+  margin-top: 0.45rem;
 }
