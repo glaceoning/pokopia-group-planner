@@ -7,122 +7,195 @@
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
-    <main class="app">
-      <header class="hero">
-        <p class="eyebrow" id="heroEyebrow">Pokopia Group Planner</p>
-        <h1 id="heroTitle">Pokopia Group Recommender</h1>
-        <p class="subtitle">
-          Recommendations are ranked by <strong>Ideal Habitat</strong> and
-          <strong>Favorites</strong>. Data scraped from <a href="https://www.serebii.net/pokemonpokopia/">serebii.net</a>
-        </p>
+    <main class="app-shell">
+      <header class="hero panel panel-hero">
+        <div class="hero-copy">
+          <p class="eyebrow" id="heroEyebrow">Pokopia Group Planner</p>
+          <h1 id="heroTitle">Build your best Pokopia group faster</h1>
+          <p class="subtitle">
+            Pick your current Pokémon, tune a few filters, and the planner will rank the best additions for your team.
+            Everything is saved only in this browser on this device.
+          </p>
+          <div class="hero-badges">
+            <span class="badge">Bulk add for mobile</span>
+            <span class="badge">Paste a full list</span>
+            <span class="badge">Live recommendations</span>
+          </div>
+        </div>
+
+        <div class="hero-card">
+          <h2>Quick start</h2>
+          <ol class="hero-steps">
+            <li>Add the Pokémon you already have.</li>
+            <li>Optionally filter by habitat or specialty.</li>
+            <li>Review the ranked recommendations and add more with one tap.</li>
+          </ol>
+          <p class="hint small">
+            Recommendation data is based on <a href="https://www.serebii.net/pokemonpokopia/">Serebii's Pokopia listings</a>.
+          </p>
+        </div>
       </header>
 
       <section class="panel personal-setup-panel">
-        <div class="panel-head">
+        <div class="section-heading">
           <div>
-            <h2>Personal Setup</h2>
-            <p class="hint small no-margin-top">Save your own trainer name, planner title, and notes in this browser.</p>
+            <p class="section-kicker">Personalize</p>
+            <h2>Your planner details</h2>
+            <p class="section-copy">Save your trainer name, planner title, and notes so the page feels like your own workspace.</p>
           </div>
-          <button id="resetPersonalization" type="button" class="ghost tiny">Reset Personal Setup</button>
+          <button id="resetPersonalization" type="button" class="ghost tiny">Reset saved details</button>
         </div>
 
         <div class="personal-grid">
           <label class="field" for="trainerName">
-            <span>Trainer Name</span>
+            <span>Trainer name</span>
             <input id="trainerName" type="text" placeholder="Your name or nickname" />
           </label>
 
           <label class="field" for="plannerTitle">
-            <span>Planner Title</span>
-            <input id="plannerTitle" type="text" placeholder="My Pokopia Planner" />
+            <span>Planner title</span>
+            <input id="plannerTitle" type="text" placeholder="My Pokopia planner" />
           </label>
         </div>
 
         <label class="field" for="personalNotes">
-          <span>Personal Notes</span>
-          <textarea id="personalNotes" rows="3" placeholder="Write anything you want to remember about your own group plans."></textarea>
+          <span>Personal notes</span>
+          <textarea id="personalNotes" rows="3" placeholder="Anything you want to remember about your team plans."></textarea>
         </label>
 
         <div class="personal-actions">
-          <button id="savePersonalization" type="button">Save Personal Setup</button>
+          <button id="savePersonalization" type="button">Save planner details</button>
           <p id="personalizationStatus" class="hint tiny-text" aria-live="polite">
-            Personal settings are stored only in your browser on this device.
+            Personal settings are stored only in this browser on this device.
           </p>
         </div>
       </section>
 
-      <section class="grid two-up">
-        <article class="panel current-group-panel">
-          <div class="panel-head">
-            <h2>Current Group</h2>
-            <button id="clearGroup" type="button" class="ghost">Clear Group</button>
+      <section class="workspace-grid">
+        <article class="panel builder-panel">
+          <div class="section-heading compact">
+            <div>
+              <p class="section-kicker">Step 1</p>
+              <h2>Add the Pokémon you already own</h2>
+              <p class="section-copy">
+                Use search plus the bulk picker, or paste a full line-by-line list to import your group in one go.
+              </p>
+            </div>
+            <button id="clearGroup" type="button" class="ghost">Clear current group</button>
           </div>
 
-          <div class="search-add">
-            <label class="sr-only" for="pokemonSearch">Find Pokemon</label>
-            <input id="pokemonSearch" type="text" placeholder="Search name or dex" />
-            <label class="sr-only" for="pokemonSelect">Pokemon</label>
-            <select id="pokemonSelect"></select>
-            <button id="addPokemon" type="button">Add Pokemon</button>
+          <div class="builder-layout">
+            <section class="builder-card">
+              <div class="builder-card-head">
+                <div>
+                  <h3>Bulk picker</h3>
+                  <p class="hint tiny-text">Search the full Pokédex list, check multiple Pokémon, then add them all at once.</p>
+                </div>
+                <p id="pickerCount" class="pill" aria-live="polite">0 selected</p>
+              </div>
+
+              <label class="field" for="pokemonSearch">
+                <span>Search by name or dex number</span>
+                <input id="pokemonSearch" type="text" placeholder="Example: Pikachu or 025" />
+              </label>
+
+              <div class="picker-toolbar">
+                <button id="selectVisiblePokemon" type="button" class="ghost tiny">Select visible</button>
+                <button id="clearVisibleSelection" type="button" class="ghost tiny">Clear visible</button>
+                <button id="addSelectedPokemon" type="button">Add selected Pokémon</button>
+              </div>
+
+              <div id="bulkPickerList" class="bulk-picker-list" role="group" aria-label="Filtered Pokémon list"></div>
+            </section>
+
+            <section class="builder-card import-card">
+              <div class="builder-card-head">
+                <div>
+                  <h3>Paste a list</h3>
+                  <p class="hint tiny-text">Paste one Pokémon per line and the planner will import every match automatically.</p>
+                </div>
+              </div>
+
+              <label class="field" for="pasteImport">
+                <span>Pokémon list</span>
+                <textarea id="pasteImport" rows="10" placeholder="Bulbasaur&#10;Ivysaur&#10;Venusaur"></textarea>
+              </label>
+
+              <div class="import-actions">
+                <button id="readClipboard" type="button" class="ghost">Paste from clipboard</button>
+                <button id="importPokemonList" type="button">Import pasted list</button>
+              </div>
+
+              <p id="importFeedback" class="hint" aria-live="polite">
+                Tip: this works great on mobile if you already have your Pokémon written in another app.
+              </p>
+            </section>
           </div>
 
-          <p class="hint tiny-text">Search filters the dropdown list.</p>
-          <p id="groupHint" class="hint" aria-live="polite"></p>
+          <div class="group-summary-row">
+            <div>
+              <p class="section-kicker">Current group</p>
+              <p id="groupHint" class="hint" aria-live="polite"></p>
+            </div>
+            <button id="toggleOverlap" type="button" class="tiny ghost" aria-expanded="false">Show overlap details</button>
+          </div>
 
-          <button id="toggleOverlap" type="button" class="tiny ghost" aria-expanded="false">
-            Show Overlap Details
-          </button>
+          <ul id="groupList" class="group-list"></ul>
 
           <div id="groupOverlapPanel" class="group-overlap hidden">
             <div class="overlap-grid">
               <section>
-                <h3>Habitat Overlap</h3>
+                <h3>Habitat overlap</h3>
                 <p id="habitatOverlapMeta" class="hint tiny-text">No shared habitat in current group.</p>
                 <ul id="habitatOverlapList" class="overlap-list"></ul>
               </section>
               <section>
-                <h3>Favorites Overlap</h3>
+                <h3>Favorites overlap</h3>
                 <p id="favoritesOverlapMeta" class="hint tiny-text">No shared favorites in current group.</p>
                 <ul id="favoritesOverlapList" class="overlap-list"></ul>
               </section>
             </div>
           </div>
 
-          <ul id="groupList" class="group-list"></ul>
-
-          <div class="current-group-bottom">
-            <div class="group-totals" aria-live="polite">
-              <p class="group-total-primary">
-                <strong>Stacked Total Group Score</strong>:
-                <span id="groupTotalStacked">0.00</span>
-              </p>
-              <p class="group-total-primary">
-                <strong>Simple Total Group Score</strong>:
-                <span id="groupTotalSimple">0.00</span>
-              </p>
+          <div class="score-summary-grid" aria-live="polite">
+            <div class="score-summary-card">
+              <span class="score-summary-label">Stacked total group score</span>
+              <strong id="groupTotalStacked">0.00</strong>
+              <p class="hint tiny-text">Rewards repeated overlap build-up across the full group.</p>
+            </div>
+            <div class="score-summary-card">
+              <span class="score-summary-label">Simple total group score</span>
+              <strong id="groupTotalSimple">0.00</strong>
+              <p class="hint tiny-text">Counts simpler overlap without as much stacking.</p>
             </div>
           </div>
         </article>
 
-        <article class="panel">
-          <h2>Recommendation Requirements</h2>
+        <aside class="panel filters-panel">
+          <div class="section-heading compact">
+            <div>
+              <p class="section-kicker">Step 2</p>
+              <h2>Tell the planner what you want</h2>
+              <p class="section-copy">These filters are optional. Leave them open if you just want the strongest overall recommendations.</p>
+            </div>
+          </div>
 
           <label class="field" for="requiredHabitat">
-            <span>Required Ideal Habitat</span>
+            <span>Only show Pokémon with this ideal habitat</span>
             <select id="requiredHabitat"></select>
           </label>
 
           <div class="field">
             <div class="field-head">
-              <span>Required Specialties (A OR B OR C)</span>
-              <button id="clearSpecialties" class="tiny ghost" type="button">Clear</button>
+              <span>Specialties to include</span>
+              <button id="clearSpecialties" class="tiny ghost" type="button">Clear all</button>
             </div>
             <div id="requiredSpecialtiesBox" class="check-grid"></div>
-            <p id="specialtiesHint" class="hint tiny-text">Any specialty</p>
+            <p id="specialtiesHint" class="hint tiny-text">Showing all specialties</p>
           </div>
 
           <label class="field" for="resultCount">
-            <span>Result Count</span>
+            <span>How many recommendations to show</span>
             <select id="resultCount">
               <option value="5">5</option>
               <option value="10" selected>10</option>
@@ -132,29 +205,30 @@
           </label>
 
           <div class="field">
-            <span>Importance Ratio</span>
+            <span>Balance habitat vs. favorites</span>
             <div class="ratio-head">
-              <span>Habitat</span>
+              <span>Habitat matters more</span>
               <output id="importanceValue" class="ratio-value">0.00</output>
-              <span>Favorites</span>
+              <span>Favorites matter more</span>
             </div>
             <input id="importanceRatio" type="range" min="-1" max="1" step="0.01" value="0" />
             <div class="ratio-ticks">
               <span>-1</span>
-              <span>0</span>
+              <span>Balanced</span>
               <span>+1</span>
             </div>
+            <p class="hint small">Move left to reward habitat matching more. Move right to reward shared favorites more.</p>
           </div>
-
-          <p class="hint small">
-            Combined score uses weighted habitat and favorites scores based on the slider.
-          </p>
-        </article>
+        </aside>
       </section>
 
-      <section class="panel">
-        <div class="panel-head">
-          <h2>Recommendations</h2>
+      <section class="panel recommendations-panel">
+        <div class="section-heading compact">
+          <div>
+            <p class="section-kicker">Step 3</p>
+            <h2>Best Pokémon to add next</h2>
+            <p class="section-copy">The table updates automatically whenever your current group or filters change.</p>
+          </div>
           <p id="status" class="hint"></p>
         </div>
 
@@ -163,7 +237,7 @@
             <thead>
               <tr>
                 <th>Rank</th>
-                <th>Pokemon</th>
+                <th>Pokémon</th>
                 <th>Ideal Habitat</th>
                 <th>Combined Score</th>
                 <th>Habitat Score</th>
@@ -178,39 +252,29 @@
         </div>
       </section>
 
-      <section class="panel quickstart-panel">
-        <h2>How To Use This App</h2>
-        <ol class="notes ordered">
-          <li>Start the local web server for this folder, then open the browser link it prints.</li>
-          <li>Add Pokemon to your current group from the dropdown or from the recommendation table.</li>
-          <li>Use the habitat, specialty, result count, and importance controls to narrow suggestions.</li>
-          <li>Use Personal Setup to save your own title, trainer name, and notes on this device.</li>
-          <li>Your current group and filters are automatically saved in your browser for next time.</li>
-        </ol>
-      </section>
+      <section class="info-grid">
+        <article class="panel info-panel">
+          <p class="section-kicker">How to use it</p>
+          <h2>A clearer workflow</h2>
+          <ol class="notes ordered">
+            <li>Start by adding the Pokémon that are already in your Pokopia group.</li>
+            <li>On mobile, the fastest option is usually pasting a list with one Pokémon name per line.</li>
+            <li>Use the filters only if you want recommendations that fit a specific habitat or specialty.</li>
+            <li>Read the recommendation scores from left to right: bigger combined scores are better fits for your current team setup.</li>
+            <li>Tap <strong>Add</strong> on any recommendation to move that Pokémon straight into your current group.</li>
+          </ol>
+        </article>
 
-      <section class="panel">
-        <h2>How Scores Work</h2>
-        <ul class="notes">
-          <li>
-            For each existing group member: habitat contributes <code>+1</code> if ideal habitat matches,
-            <code>-1</code> if habitat is in conflict (i.e. dark, bright), and <code>0</code> otherwise.
-          </li>
-          <li>
-            Favorites contribute <code>+n</code> where <code>n</code> is the number of shared favorites with that
-            member.
-          </li>
-          <li>
-            Let slider value be <code>a</code> (from <code>-1</code> to <code>+1</code>):
-            <code>combined = (1 - a) * habitat_score + (1 + a) * favorites_score</code>.
-            We may update this formula later as game mechanics become clearer.
-          </li>
-          <li>
-            Group totals are shown in two modes: <code>stacked</code> counts full overlap build-up
-            (<code>k - 1 + ... + 1</code>), while <code>simple</code> counts <code>k - 1</code> for
-            <code>k</code> Pokemon sharing a feature. Conflicting habitat pairs subtract <code>1</code> in both modes.
-          </li>
-        </ul>
+        <article class="panel info-panel">
+          <p class="section-kicker">How scoring works</p>
+          <h2>What the numbers mean</h2>
+          <ul class="notes">
+            <li>Habitat score adds points for matching habitats and subtracts points for habitats that directly conflict.</li>
+            <li>Favorites score adds points based on how many favorite Pokémon a candidate shares with your current team.</li>
+            <li>The slider lets you decide whether habitat or favorites should influence the ranking more.</li>
+            <li>The overlap section helps you quickly see where your existing group is already clustering too heavily.</li>
+          </ul>
+        </article>
       </section>
     </main>
 
