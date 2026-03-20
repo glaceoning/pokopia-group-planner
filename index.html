@@ -114,28 +114,47 @@
           </div>
           <div class="toolbar-actions">
             <button id="clearOwnedDex" type="button" class="ghost">Clear owned list</button>
-            <button id="selectAllVisibleCatalog" type="button" class="ghost tiny">Select visible</button>
-            <button id="clearVisibleCatalog" type="button" class="ghost tiny">Clear visible</button>
           </div>
         </div>
 
         <div class="import-layout">
-          <section class="glass-card">
+          <section class="glass-card collapsible-card collapsed" id="catalogCard">
             <div class="card-head">
               <div>
-                <h3>Catalog</h3>
+                <h3>Import Catalogue</h3>
                 <p class="hint tiny-text">Search and select Pokémon to add.</p>
               </div>
-              <p id="catalogSelectionCount" class="pill">0 selected</p>
+              <div class="card-head-actions">
+                <p id="catalogSelectionCount" class="pill">0 selected</p>
+                <button id="toggleCatalog" type="button" class="ghost tiny collapsible-toggle" aria-expanded="false" aria-controls="catalogContent">Expand</button>
+              </div>
             </div>
 
-            <label class="field" for="catalogSearch">
-              <span>Search by name or dex number</span>
-              <input id="catalogSearch" type="text" placeholder="Example: Pikachu or 025" />
-            </label>
+            <div id="catalogContent" class="collapsible-content hidden">
+              <label class="field" for="catalogSearch">
+                <span>Search by name or dex number</span>
+                <input id="catalogSearch" type="text" placeholder="Example: Pikachu or 025" />
+              </label>
 
-            <button id="addCatalogSelection" type="button">Add selected</button>
-            <div id="catalogList" class="catalog-list" role="group" aria-label="Full Pokémon catalog"></div>
+              <div class="filter-stack" role="group" aria-label="Catalogue filters">
+                <p class="hint tiny-text">Filters</p>
+                <label class="check-item toggle-row" for="filterHideOwned">
+                  <input id="filterHideOwned" type="checkbox" />
+                  <span>Hide Pokémon already acquired</span>
+                </label>
+                <label class="check-item toggle-row" for="filterOwnedOnly">
+                  <input id="filterOwnedOnly" type="checkbox" />
+                  <span>Hide unobtained Pokémon</span>
+                </label>
+                <label class="check-item toggle-row" for="filterHideAssigned">
+                  <input id="filterHideAssigned" type="checkbox" />
+                  <span>Hide Pokémon already assigned to a House</span>
+                </label>
+              </div>
+
+              <button id="addCatalogSelection" type="button">Add selected</button>
+              <div id="catalogList" class="catalog-list" role="group" aria-label="Full Pokémon catalog"></div>
+            </div>
           </section>
 
           <section class="glass-card">
@@ -229,8 +248,8 @@
 
             <div class="house-form-grid">
               <label class="field" for="houseNameInput">
-                <span>House name</span>
-                <input id="houseNameInput" type="text" placeholder="Example: Coral Core" />
+                <span>House name <small class="hint">Optional</small></span>
+                <input id="houseNameInput" type="text" placeholder="Optional nickname" />
               </label>
               <button id="saveHouse" type="button">Save House</button>
             </div>
@@ -270,30 +289,34 @@
             <div class="card-head">
               <div>
                 <h3>Auto-generate a House</h3>
-                <p class="hint tiny-text">Choose a size range and let the planner assemble the best available House.</p>
+                <p class="hint tiny-text">Choose a maximum size and let the planner assemble the best available House.</p>
               </div>
             </div>
 
             <div class="house-generator-grid">
               <label class="field" for="autoHouseName">
-                <span>House name</span>
-                <input id="autoHouseName" type="text" placeholder="Example: Tide Vanguard" />
+                <span>House name <small class="hint">Optional</small></span>
+                <input id="autoHouseName" type="text" placeholder="Optional nickname" />
               </label>
 
-              <div class="range-grid">
-                <label class="field" for="autoHouseMin">
-                  <span>Minimum size</span>
-                  <input id="autoHouseMin" type="number" min="1" max="10" value="2" />
-                </label>
-                <label class="field" for="autoHouseMax">
-                  <span>Maximum size</span>
-                  <input id="autoHouseMax" type="number" min="1" max="10" value="4" />
-                </label>
-              </div>
+              <label class="field" for="autoHouseMax">
+                <span>Maximum size</span>
+                <select id="autoHouseMax">
+                  <option value="2">2 Pokémon</option>
+                  <option value="3">3 Pokémon</option>
+                  <option value="4" selected>4 Pokémon</option>
+                  <option value="5">5 Pokémon</option>
+                  <option value="6">6 Pokémon</option>
+                  <option value="7">7 Pokémon</option>
+                  <option value="8">8 Pokémon</option>
+                  <option value="9">9 Pokémon</option>
+                  <option value="10">10 Pokémon</option>
+                </select>
+              </label>
 
               <button id="autoGenerateHouse" type="button">Generate House</button>
               <p id="autoHouseFeedback" class="hint" aria-live="polite">
-                Auto-generation uses your unassigned owned Pokémon and optimizes for overall House synergy.
+                Auto-generation uses your unassigned owned Pokémon and optimizes for overall House synergy up to the selected size.
               </p>
             </div>
           </section>
@@ -345,12 +368,17 @@
               <select id="requiredHabitat"></select>
             </label>
 
-            <div class="field">
+            <div class="field collapsible-card collapsed" id="specialtiesCard">
               <div class="field-head">
                 <span>Specialties</span>
-                <button id="clearSpecialties" class="tiny ghost" type="button">Clear</button>
+                <div class="card-head-actions">
+                  <button id="clearSpecialties" class="tiny ghost" type="button">Clear</button>
+                  <button id="toggleSpecialties" class="tiny ghost collapsible-toggle" type="button" aria-expanded="false" aria-controls="specialtiesContent">Expand</button>
+                </div>
               </div>
-              <div id="requiredSpecialtiesBox" class="check-grid"></div>
+              <div id="specialtiesContent" class="collapsible-content hidden">
+                <div id="requiredSpecialtiesBox" class="check-grid"></div>
+              </div>
               <p id="specialtiesHint" class="hint tiny-text">Showing all specialties</p>
             </div>
 

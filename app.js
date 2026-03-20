@@ -30,6 +30,8 @@ const state = {
   groupOverlapVisible: false,
   lastRecommendationRows: [],
   mobileSection: 'overview',
+  importCatalogExpanded: false,
+  specialtiesExpanded: false,
 };
 
 const elements = {
@@ -63,8 +65,12 @@ const elements = {
   catalogSearch: document.querySelector('#catalogSearch'),
   catalogList: document.querySelector('#catalogList'),
   catalogSelectionCount: document.querySelector('#catalogSelectionCount'),
-  selectAllVisibleCatalog: document.querySelector('#selectAllVisibleCatalog'),
-  clearVisibleCatalog: document.querySelector('#clearVisibleCatalog'),
+  catalogCard: document.querySelector('#catalogCard'),
+  catalogContent: document.querySelector('#catalogContent'),
+  toggleCatalog: document.querySelector('#toggleCatalog'),
+  filterHideOwned: document.querySelector('#filterHideOwned'),
+  filterOwnedOnly: document.querySelector('#filterOwnedOnly'),
+  filterHideAssigned: document.querySelector('#filterHideAssigned'),
   addCatalogSelection: document.querySelector('#addCatalogSelection'),
   clearOwnedDex: document.querySelector('#clearOwnedDex'),
   pasteImport: document.querySelector('#pasteImport'),
@@ -85,7 +91,6 @@ const elements = {
   houseSaveFeedback: document.querySelector('#houseSaveFeedback'),
   clearHouses: document.querySelector('#clearHouses'),
   autoHouseName: document.querySelector('#autoHouseName'),
-  autoHouseMin: document.querySelector('#autoHouseMin'),
   autoHouseMax: document.querySelector('#autoHouseMax'),
   autoGenerateHouse: document.querySelector('#autoGenerateHouse'),
   autoHouseFeedback: document.querySelector('#autoHouseFeedback'),
@@ -102,6 +107,9 @@ const elements = {
   requiredHabitat: document.querySelector('#requiredHabitat'),
   requiredSpecialtiesBox: document.querySelector('#requiredSpecialtiesBox'),
   clearSpecialties: document.querySelector('#clearSpecialties'),
+  specialtiesCard: document.querySelector('#specialtiesCard'),
+  specialtiesContent: document.querySelector('#specialtiesContent'),
+  toggleSpecialties: document.querySelector('#toggleSpecialties'),
   specialtiesHint: document.querySelector('#specialtiesHint'),
   resultCount: document.querySelector('#resultCount'),
   importanceRatio: document.querySelector('#importanceRatio'),
@@ -322,6 +330,30 @@ function getImportanceRatio() {
 
 function updateImportanceRatioLabel() {
   elements.importanceValue.textContent = getImportanceRatio().toFixed(2);
+}
+
+function toggleCollapsible(card, content, toggle, expanded, labels = { expanded: 'Collapse', collapsed: 'Expand' }) {
+  if (!card || !content || !toggle) {
+    return;
+  }
+
+  card.classList.toggle('collapsed', !expanded);
+  card.classList.toggle('expanded', expanded);
+  content.classList.toggle('hidden', !expanded);
+  toggle.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+  toggle.textContent = expanded ? labels.expanded : labels.collapsed;
+}
+
+function syncCatalogCollapse() {
+  toggleCollapsible(elements.catalogCard, elements.catalogContent, elements.toggleCatalog, state.importCatalogExpanded);
+}
+
+function syncSpecialtiesCollapse() {
+  toggleCollapsible(elements.specialtiesCard, elements.specialtiesContent, elements.toggleSpecialties, state.specialtiesExpanded);
+}
+
+function formatHouseNumber(value) {
+  return String(value).padStart(3, '0');
 }
 
 function habitatPairScore(candidateHabitat, memberHabitat) {
@@ -556,7 +588,7 @@ function sanitizeHouse(raw) {
 
   return {
     id: typeof raw.id === 'string' && raw.id ? raw.id : `house-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-    name: String(raw.name || '').trim() || `House ${state.houses.length + 1}`,
+    name: String(raw.name || '').trim() || formatHouseNumber(state.houses.length + 1),
     memberIds,
     stackedScore: Number.isFinite(raw.stackedScore) ? raw.stackedScore : 0,
     simpleScore: Number.isFinite(raw.simpleScore) ? raw.simpleScore : 0,
@@ -564,6 +596,7 @@ function sanitizeHouse(raw) {
     createdAt: String(raw.createdAt || new Date().toISOString()),
     source: raw.source === 'auto' ? 'auto' : 'manual',
     sizeRange: raw.sizeRange && typeof raw.sizeRange === 'object' ? raw.sizeRange : null,
+    sequence: Number.isInteger(raw.sequence) && raw.sequence > 0 ? raw.sequence : state.houses.length + 1,
   };
 }
 
@@ -678,10 +711,24 @@ function updateSpecialtiesHint() {
 
 function getFilteredCatalogPokemon() {
   const query = normalizeText(elements.catalogSearch.value).replace(/^#/, '');
-  if (!query) {
-    return state.sortedPokemon;
-  }
-  return state.sortedPokemon.filter((pokemon) => pokemon.searchText.includes(query));
+  const ownedSet = new Set(state.ownedIds);
+  const assignedSet = getAssignedPokemonIdsSet();
+
+  return state.sortedPokemon.filter((pokemon) => {
+    if (elements.filterHideOwned.checked && ownedSet.has(pokemon.id)) {
+      return false;
+    }
+    if (elements.filterOwnedOnly.checked && !ownedSet.has(pokemon.id)) {
+      return false;
+    }
+    if (elements.filterHideAssigned.checked && assignedSet.has(pokemon.id)) {
+      return false;
+    }
+    if (!query) {
+      return true;
+    }
+    return pokemon.searchText.includes(query);
+  });
 }
 
 function updateCatalogSelectionCount() {
@@ -797,6 +844,10 @@ function clearOwnedDex() {
   if (!state.ownedIds.length && !state.houses.length && !state.teamIds.length) {
     return;
   }
+
+  if (!window.confirm('Clear your owned list, active squad, and all saved Houses?')) {
+    return;
+  }
   state.ownedIds = [];
   state.teamIds = [];
   state.houses = [];
@@ -831,6 +882,10 @@ function removePokemonFromTeam(id) {
 
 function clearTeam() {
   if (!state.teamIds.length) {
+    return;
+  }
+
+  if (!window.confirm('Clear the current active squad?')) {
     return;
   }
   state.teamIds = [];
@@ -1080,13 +1135,13 @@ function runRecommendation() {
 }
 
 function getHouseDisplayName(house) {
-  return house.name || `House ${house.id}`;
+  return house.name || formatHouseNumber(house.sequence || 1);
 }
 
 function buildDefaultHouseName() {
   state.houseCounter += 1;
   saveHouses();
-  return `House ${state.houseCounter}`;
+  return formatHouseNumber(state.houseCounter);
 }
 
 function createHouseRecord({ name, memberIds, source, sizeRange }) {
@@ -1102,6 +1157,7 @@ function createHouseRecord({ name, memberIds, source, sizeRange }) {
     createdAt: new Date().toISOString(),
     source,
     sizeRange: sizeRange || null,
+    sequence: state.houseCounter,
   };
 }
 
@@ -1142,6 +1198,10 @@ function releaseHouseById(id) {
 function clearHouses() {
   if (!state.houses.length) {
     elements.autoHouseFeedback.textContent = 'There are no Houses to release.';
+    return;
+  }
+
+  if (!window.confirm('Release all saved Houses and make their Pokémon available again?')) {
     return;
   }
 
@@ -1188,7 +1248,8 @@ function isBetterHouseCandidate(candidate, incumbent) {
   return compareHouseCandidates(candidate, incumbent) < 0;
 }
 
-function generateBestHouseFromRange(minSize, maxSize) {
+function generateBestHouseFromRange(maxSize) {
+  const minSize = 2;
   const availablePool = getAvailableOwnedPokemon().filter((pokemon) => !state.teamIds.includes(pokemon.id));
   if (availablePool.length < minSize) {
     return null;
@@ -1241,41 +1302,30 @@ function generateBestHouseFromRange(minSize, maxSize) {
 
 function normalizeAutoHouseRange() {
   const availableCount = getAvailableOwnedPokemon().filter((pokemon) => !state.teamIds.includes(pokemon.id)).length;
-  let minSize = Number.parseInt(elements.autoHouseMin.value, 10);
   let maxSize = Number.parseInt(elements.autoHouseMax.value, 10);
 
-  if (!Number.isFinite(minSize)) {
-    minSize = 2;
-  }
   if (!Number.isFinite(maxSize)) {
-    maxSize = minSize;
+    maxSize = 4;
   }
 
-  minSize = Math.max(1, Math.min(10, minSize));
   maxSize = Math.max(1, Math.min(10, maxSize));
-  if (minSize > maxSize) {
-    [minSize, maxSize] = [maxSize, minSize];
-  }
-
   maxSize = Math.min(maxSize, availableCount || maxSize);
-  minSize = Math.min(minSize, maxSize);
 
-  elements.autoHouseMin.value = String(minSize);
   elements.autoHouseMax.value = String(maxSize);
 
-  return { minSize, maxSize, availableCount };
+  return { maxSize, availableCount };
 }
 
 function generateAutoHouse() {
-  const { minSize, maxSize, availableCount } = normalizeAutoHouseRange();
+  const { maxSize, availableCount } = normalizeAutoHouseRange();
 
-  if (!availableCount || availableCount < minSize) {
-    elements.autoHouseFeedback.textContent = 'Not enough unassigned owned Pokémon are available for that size range.';
+  if (availableCount < 2) {
+    elements.autoHouseFeedback.textContent = 'At least 2 unassigned owned Pokémon are needed to generate a House.';
     return;
   }
 
-  const best = generateBestHouseFromRange(minSize, maxSize);
-  if (!best || best.memberIds.length < minSize) {
+  const best = generateBestHouseFromRange(maxSize);
+  if (!best) {
     elements.autoHouseFeedback.textContent = 'No valid House could be generated from the current available pool.';
     return;
   }
@@ -1284,7 +1334,7 @@ function generateAutoHouse() {
     name: elements.autoHouseName.value,
     memberIds: best.memberIds,
     source: 'auto',
-    sizeRange: { min: minSize, max: maxSize },
+    sizeRange: { min: 2, max: maxSize },
   });
 
   state.houses.unshift(house);
@@ -1332,7 +1382,7 @@ function renderHouses() {
         </div>
       </div>
 
-      <p class="hint tiny-text">${house.sizeRange ? `Generated within size range ${house.sizeRange.min}-${house.sizeRange.max}. ` : ''}Created ${new Date(house.createdAt).toLocaleString()}.</p>
+      <p class="hint tiny-text">${house.sizeRange ? `Generated with a maximum size of ${house.sizeRange.max} (minimum 2). ` : ''}Created ${new Date(house.createdAt).toLocaleString()}.</p>
 
       <ul class="house-member-list">
         ${members
@@ -1472,13 +1522,6 @@ function clearSpecialtiesSelection() {
   runRecommendation();
 }
 
-function setVisibleCatalogSelection(checked) {
-  elements.catalogList.querySelectorAll("input[type='checkbox']").forEach((input) => {
-    input.checked = checked;
-  });
-  updateCatalogSelectionCount();
-}
-
 function addSelectedCatalogPokemon() {
   const ids = [...elements.catalogList.querySelectorAll("input[type='checkbox']:checked")].map((input) => input.value);
   if (!ids.length) {
@@ -1550,8 +1593,13 @@ function bindEvents() {
       updateCatalogSelectionCount();
     }
   });
-  elements.selectAllVisibleCatalog.addEventListener('click', () => setVisibleCatalogSelection(true));
-  elements.clearVisibleCatalog.addEventListener('click', () => setVisibleCatalogSelection(false));
+  elements.toggleCatalog.addEventListener('click', () => {
+    state.importCatalogExpanded = !state.importCatalogExpanded;
+    syncCatalogCollapse();
+  });
+  [elements.filterHideOwned, elements.filterOwnedOnly, elements.filterHideAssigned].forEach((input) => {
+    input.addEventListener('change', renderCatalogList);
+  });
   elements.addCatalogSelection.addEventListener('click', addSelectedCatalogPokemon);
   elements.clearOwnedDex.addEventListener('click', clearOwnedDex);
 
@@ -1611,6 +1659,10 @@ function bindEvents() {
     updateImportanceRatioLabel();
     refreshAllViews();
   });
+  elements.toggleSpecialties.addEventListener('click', () => {
+    state.specialtiesExpanded = !state.specialtiesExpanded;
+    syncSpecialtiesCollapse();
+  });
   elements.clearSpecialties.addEventListener('click', clearSpecialtiesSelection);
   elements.requiredSpecialtiesBox.addEventListener('change', () => {
     updateSpecialtiesHint();
@@ -1654,6 +1706,8 @@ async function init() {
     restoreTeamIds();
     updateImportanceRatioLabel();
     bindEvents();
+    syncCatalogCollapse();
+    syncSpecialtiesCollapse();
     syncMobileSectionVisibility();
     refreshAllViews();
 
