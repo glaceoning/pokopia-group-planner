@@ -14,11 +14,15 @@
       <header class="hero panel">
         <div class="hero-copy">
           <p class="eyebrow" id="heroEyebrow">Pokopia Group Planner</p>
-          <h1 id="heroTitle">Build better Pokopia squads.</h1>
-          <p class="subtitle">Import the Pokémon you own, choose your squad, and compare recommendations.</p>
+          <h1 id="heroTitle">Build stronger Pokopia Houses and squads.</h1>
+          <p class="subtitle">
+            Import your Pokédex, build active squads, save them as permanent Houses, or auto-generate the best new House from
+            unassigned Pokémon.
+          </p>
 
           <div class="hero-actions">
             <button id="jumpToImport" type="button">Import Pokémon</button>
+            <button id="jumpToHouses" type="button" class="ghost">Manage Houses</button>
             <button id="jumpToRecommendations" type="button" class="ghost">View recommendations</button>
           </div>
         </div>
@@ -30,14 +34,19 @@
             <small>Pokémon in your list</small>
           </article>
           <article class="stat-card">
+            <span class="stat-label">Available</span>
+            <strong id="availableCountHero">0</strong>
+            <small>Unassigned Pokémon</small>
+          </article>
+          <article class="stat-card">
+            <span class="stat-label">Houses</span>
+            <strong id="houseCountHero">0</strong>
+            <small>Saved groups</small>
+          </article>
+          <article class="stat-card">
             <span class="stat-label">Squad</span>
             <strong id="teamCountHero">0</strong>
             <small>Pokémon in the active squad</small>
-          </article>
-          <article class="stat-card">
-            <span class="stat-label">Mode</span>
-            <strong id="recommendationModeHero">Owned only</strong>
-            <small>Recommendation pool</small>
           </article>
         </div>
       </header>
@@ -50,11 +59,21 @@
           <p id="status" class="hint" aria-live="polite"></p>
         </div>
 
-        <div class="stat-grid">
+        <div class="stat-grid overview-grid">
           <div class="stat-card">
             <span class="stat-label">Owned</span>
             <strong id="ownedCountStat">0</strong>
             <small id="ownedCoverageStat">0% of all Pokopia Pokémon</small>
+          </div>
+          <div class="stat-card">
+            <span class="stat-label">Available</span>
+            <strong id="availableCountStat">0</strong>
+            <small id="availableSummaryStat">Ready for new squads</small>
+          </div>
+          <div class="stat-card">
+            <span class="stat-label">Houses</span>
+            <strong id="houseCountStat">0</strong>
+            <small id="houseSummaryStat">No saved Houses yet</small>
           </div>
           <div class="stat-card">
             <span class="stat-label">Squad</span>
@@ -136,7 +155,7 @@
           <div class="section-heading compact">
             <div>
               <h2>Available owned Pokémon</h2>
-              <p class="section-copy">Choose which owned Pokémon to add to the squad.</p>
+              <p class="section-copy">Choose unassigned owned Pokémon to add to the active squad.</p>
             </div>
             <div class="toolbar-actions">
               <button id="clearTeam" type="button" class="ghost">Clear squad</button>
@@ -145,8 +164,8 @@
 
           <div class="owned-toolbar">
             <label class="field grow" for="ownedSearch">
-              <span>Search owned Pokémon</span>
-              <input id="ownedSearch" type="text" placeholder="Filter your owned Pokémon" />
+              <span>Search available Pokémon</span>
+              <input id="ownedSearch" type="text" placeholder="Filter your unassigned owned Pokémon" />
             </label>
             <div class="segment-info">
               <span class="segment-label">Available</span>
@@ -155,8 +174,8 @@
           </div>
 
           <div id="ownedDexEmpty" class="empty-state hidden">
-            <h3>No owned Pokémon yet</h3>
-            <p>Add Pokémon above to populate this list.</p>
+            <h3>No available Pokémon</h3>
+            <p>Add Pokémon above or release a House to populate this list.</p>
           </div>
 
           <div id="ownedDexList" class="owned-dex-list"></div>
@@ -165,15 +184,15 @@
         <aside class="panel squad-panel">
           <div class="section-heading compact">
             <div>
-              <h2>Squad</h2>
-              <p class="section-copy">Review the current team and its overlap.</p>
+              <h2>Active squad</h2>
+              <p class="section-copy">Review the current team, then save it as a permanent House.</p>
             </div>
             <button id="toggleOverlap" type="button" class="ghost tiny" aria-expanded="false">Show overlap</button>
           </div>
 
           <div id="teamEmpty" class="empty-state">
             <h3>No squad yet</h3>
-            <p>Add owned Pokémon to start building.</p>
+            <p>Add available Pokémon to start building.</p>
           </div>
 
           <ul id="teamList" class="team-list"></ul>
@@ -188,6 +207,24 @@
               <strong id="groupTotalSimple">0.00</strong>
             </div>
           </div>
+
+          <section class="house-save-card glass-card">
+            <div class="card-head compact-card-head">
+              <div>
+                <h3>Save current squad as a House</h3>
+                <p class="hint tiny-text">Saving a House locks these Pokémon together and clears the active squad.</p>
+              </div>
+            </div>
+
+            <div class="house-form-grid">
+              <label class="field" for="houseNameInput">
+                <span>House name</span>
+                <input id="houseNameInput" type="text" placeholder="Example: Coral Core" />
+              </label>
+              <button id="saveHouse" type="button">Save House</button>
+            </div>
+            <p id="houseSaveFeedback" class="hint" aria-live="polite">Build a squad, then save it as a House.</p>
+          </section>
 
           <div id="groupOverlapPanel" class="group-overlap hidden">
             <div class="overlap-grid">
@@ -206,11 +243,74 @@
         </aside>
       </section>
 
+      <section class="panel houses-panel" id="housesSection">
+        <div class="section-heading">
+          <div>
+            <h2>Houses</h2>
+            <p class="section-copy">Save finished squads or auto-generate the strongest new House from unassigned Pokémon.</p>
+          </div>
+          <div class="toolbar-actions">
+            <button id="clearHouses" type="button" class="ghost">Release all Houses</button>
+          </div>
+        </div>
+
+        <div class="houses-layout">
+          <section class="glass-card house-generator-card">
+            <div class="card-head">
+              <div>
+                <h3>Auto-generate a House</h3>
+                <p class="hint tiny-text">Choose a size range and let the planner assemble the best available House.</p>
+              </div>
+            </div>
+
+            <div class="house-generator-grid">
+              <label class="field" for="autoHouseName">
+                <span>House name</span>
+                <input id="autoHouseName" type="text" placeholder="Example: Tide Vanguard" />
+              </label>
+
+              <div class="range-grid">
+                <label class="field" for="autoHouseMin">
+                  <span>Minimum size</span>
+                  <input id="autoHouseMin" type="number" min="1" max="10" value="2" />
+                </label>
+                <label class="field" for="autoHouseMax">
+                  <span>Maximum size</span>
+                  <input id="autoHouseMax" type="number" min="1" max="10" value="4" />
+                </label>
+              </div>
+
+              <button id="autoGenerateHouse" type="button">Generate House</button>
+              <p id="autoHouseFeedback" class="hint" aria-live="polite">
+                Auto-generation uses your unassigned owned Pokémon and optimizes for overall House synergy.
+              </p>
+            </div>
+          </section>
+
+          <section class="glass-card house-list-card">
+            <div class="card-head">
+              <div>
+                <h3>Saved Houses</h3>
+                <p class="hint tiny-text">Each House permanently reserves its Pokémon until released.</p>
+              </div>
+              <p id="houseRosterSummary" class="pill">0 Houses</p>
+            </div>
+
+            <div id="housesEmpty" class="empty-state">
+              <h3>No Houses saved yet</h3>
+              <p>Save your active squad or generate a House automatically.</p>
+            </div>
+
+            <div id="houseList" class="house-list"></div>
+          </section>
+        </div>
+      </section>
+
       <section class="panel recommendations-panel" id="recommendationsSection">
         <div class="section-heading compact">
           <div>
             <h2>Recommendations</h2>
-            <p class="section-copy">Adjust filters and compare candidates for the current squad.</p>
+            <p class="section-copy">Adjust filters and compare candidates for the current active squad.</p>
           </div>
         </div>
 
@@ -260,46 +360,48 @@
                 <output id="importanceValue" class="ratio-value">0.00</output>
                 <span>Favorites</span>
               </div>
-              <input id="importanceRatio" type="range" min="-1" max="1" step="0.01" value="0" />
-              <div class="ratio-ticks">
-                <span>-1</span>
+              <input id="importanceRatio" type="range" min="-1" max="1" step="0.05" value="0" />
+              <div class="ratio-ticks hint tiny-text">
+                <span>Lean habitat</span>
                 <span>Balanced</span>
-                <span>+1</span>
+                <span>Lean favorites</span>
               </div>
             </div>
           </aside>
 
-          <div class="results-column">
-            <div id="topRecommendationSpotlight" class="spotlight-card hidden">
-              <span class="spotlight-kicker">Top recommendation</span>
+          <section class="results-column">
+            <article id="topRecommendationSpotlight" class="spotlight-card hidden">
+              <p class="spotlight-kicker">Top recommendation</p>
               <h3 id="spotlightName">—</h3>
-              <p id="spotlightSummary" class="hint">Build a squad to see the best match.</p>
-            </div>
+              <p id="spotlightSummary" class="hint">No recommendation yet.</p>
+            </article>
 
-            <div class="table-wrap card-surface">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Rank</th>
-                    <th>Pokémon</th>
-                    <th>Ownership</th>
-                    <th>Habitat</th>
-                    <th>Combined</th>
-                    <th>Habitat</th>
-                    <th>Favorites</th>
-                    <th>Shared favorites</th>
-                    <th>Specialties</th>
-                    <th>Action</th>
-                  </tr>
-                </thead>
-                <tbody id="resultsBody"></tbody>
-              </table>
-            </div>
-          </div>
+            <article class="panel card-surface">
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Rank</th>
+                      <th>Pokémon</th>
+                      <th>Ownership</th>
+                      <th>Habitat</th>
+                      <th>Combined</th>
+                      <th>Habitat</th>
+                      <th>Favorites</th>
+                      <th>Shared favorites</th>
+                      <th>Specialties</th>
+                      <th>Action</th>
+                    </tr>
+                  </thead>
+                  <tbody id="resultsBody"></tbody>
+                </table>
+              </div>
+            </article>
+          </section>
         </div>
       </section>
     </main>
 
-    <script src="app.js" type="module"></script>
+    <script type="module" src="app.js"></script>
   </body>
 </html>

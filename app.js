@@ -12,6 +12,8 @@ const STORAGE_KEYS = {
   groupIds: 'pokopia.groupIds',
   ownedIds: 'pokopia.ownedIds',
   requirements: 'pokopia.requirements',
+  houses: 'pokopia.houses',
+  houseCounter: 'pokopia.houseCounter',
 };
 
 const state = {
@@ -21,6 +23,8 @@ const state = {
   pokemonLookup: new Map(),
   ownedIds: [],
   teamIds: [],
+  houses: [],
+  houseCounter: 0,
   filteredCatalogIds: [],
   filteredOwnedIds: [],
   groupOverlapVisible: false,
@@ -31,14 +35,21 @@ const elements = {
   heroEyebrow: document.querySelector('#heroEyebrow'),
   heroTitle: document.querySelector('#heroTitle'),
   jumpToImport: document.querySelector('#jumpToImport'),
+  jumpToHouses: document.querySelector('#jumpToHouses'),
   jumpToRecommendations: document.querySelector('#jumpToRecommendations'),
   importSection: document.querySelector('#importSection'),
+  housesSection: document.querySelector('#housesSection'),
   recommendationsSection: document.querySelector('#recommendationsSection'),
   ownedCountHero: document.querySelector('#ownedCountHero'),
+  availableCountHero: document.querySelector('#availableCountHero'),
+  houseCountHero: document.querySelector('#houseCountHero'),
   teamCountHero: document.querySelector('#teamCountHero'),
-  recommendationModeHero: document.querySelector('#recommendationModeHero'),
   ownedCountStat: document.querySelector('#ownedCountStat'),
   ownedCoverageStat: document.querySelector('#ownedCoverageStat'),
+  availableCountStat: document.querySelector('#availableCountStat'),
+  availableSummaryStat: document.querySelector('#availableSummaryStat'),
+  houseCountStat: document.querySelector('#houseCountStat'),
+  houseSummaryStat: document.querySelector('#houseSummaryStat'),
   teamCountStat: document.querySelector('#teamCountStat'),
   teamSummaryStat: document.querySelector('#teamSummaryStat'),
   topRecommendationScore: document.querySelector('#topRecommendationScore'),
@@ -66,6 +77,18 @@ const elements = {
   teamList: document.querySelector('#teamList'),
   groupTotalStacked: document.querySelector('#groupTotalStacked'),
   groupTotalSimple: document.querySelector('#groupTotalSimple'),
+  houseNameInput: document.querySelector('#houseNameInput'),
+  saveHouse: document.querySelector('#saveHouse'),
+  houseSaveFeedback: document.querySelector('#houseSaveFeedback'),
+  clearHouses: document.querySelector('#clearHouses'),
+  autoHouseName: document.querySelector('#autoHouseName'),
+  autoHouseMin: document.querySelector('#autoHouseMin'),
+  autoHouseMax: document.querySelector('#autoHouseMax'),
+  autoGenerateHouse: document.querySelector('#autoGenerateHouse'),
+  autoHouseFeedback: document.querySelector('#autoHouseFeedback'),
+  houseRosterSummary: document.querySelector('#houseRosterSummary'),
+  housesEmpty: document.querySelector('#housesEmpty'),
+  houseList: document.querySelector('#houseList'),
   toggleOverlap: document.querySelector('#toggleOverlap'),
   groupOverlapPanel: document.querySelector('#groupOverlapPanel'),
   habitatOverlapMeta: document.querySelector('#habitatOverlapMeta'),
@@ -155,14 +178,7 @@ function buildPokemonLookup() {
   const lookup = new Map();
 
   for (const pokemon of state.sortedPokemon) {
-    const tokens = [
-      pokemon.name,
-      pokemon.label,
-      pokemon.dexPadded,
-      pokemon.dexRaw,
-      `#${pokemon.dexPadded}`,
-      `#${pokemon.dexRaw}`,
-    ];
+    const tokens = [pokemon.name, pokemon.label, pokemon.dexPadded, pokemon.dexRaw, `#${pokemon.dexPadded}`, `#${pokemon.dexRaw}`];
 
     for (const token of tokens) {
       const normalized = normalizeImportToken(token);
@@ -201,6 +217,28 @@ function getOwnedPokemon() {
 
 function getTeamMembers() {
   return state.teamIds.map((id) => state.pokemonById.get(id)).filter(Boolean);
+}
+
+function getHouseMembers(house) {
+  return house.memberIds.map((id) => state.pokemonById.get(id)).filter(Boolean);
+}
+
+function getAssignedPokemonIdsSet() {
+  return new Set(state.houses.flatMap((house) => house.memberIds));
+}
+
+function getAvailableOwnedIds() {
+  const assignedIds = getAssignedPokemonIdsSet();
+  return state.ownedIds.filter((id) => !assignedIds.has(id));
+}
+
+function getAvailableOwnedPokemon() {
+  return getAvailableOwnedIds().map((id) => state.pokemonById.get(id)).filter(Boolean);
+}
+
+function getRecommendationEligibleIds() {
+  const assignedIds = getAssignedPokemonIdsSet();
+  return state.sortedPokemon.map((pokemon) => pokemon.id).filter((id) => !assignedIds.has(id));
 }
 
 function getOwnedOnlyMode() {
@@ -341,6 +379,23 @@ function computeGroupScoreSummary(groupMembers, importanceRatio) {
   };
 }
 
+function buildHouseRating(summary) {
+  const stacked = summary.stackedCombined;
+  if (stacked >= 14) {
+    return 'S';
+  }
+  if (stacked >= 9) {
+    return 'A';
+  }
+  if (stacked >= 5) {
+    return 'B';
+  }
+  if (stacked >= 2) {
+    return 'C';
+  }
+  return 'D';
+}
+
 function renderOverlapList(listEl, rows, emptyText) {
   listEl.innerHTML = '';
 
@@ -419,12 +474,68 @@ function restoreOwnedIds() {
   state.ownedIds = ids.filter((id) => typeof id === 'string' && state.pokemonById.has(id));
 }
 
+function sanitizeHouse(raw) {
+  if (!raw || typeof raw !== 'object') {
+    return null;
+  }
+
+  const memberIds = Array.isArray(raw.memberIds)
+    ? unique(raw.memberIds.filter((id) => typeof id === 'string' && state.pokemonById.has(id) && state.ownedIds.includes(id)))
+    : [];
+
+  if (!memberIds.length) {
+    return null;
+  }
+
+  return {
+    id: typeof raw.id === 'string' && raw.id ? raw.id : `house-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    name: String(raw.name || '').trim() || `House ${state.houses.length + 1}`,
+    memberIds,
+    stackedScore: Number.isFinite(raw.stackedScore) ? raw.stackedScore : 0,
+    simpleScore: Number.isFinite(raw.simpleScore) ? raw.simpleScore : 0,
+    rating: String(raw.rating || '').trim() || 'D',
+    createdAt: String(raw.createdAt || new Date().toISOString()),
+    source: raw.source === 'auto' ? 'auto' : 'manual',
+    sizeRange: raw.sizeRange && typeof raw.sizeRange === 'object' ? raw.sizeRange : null,
+  };
+}
+
+function restoreHouses() {
+  const rawHouses = readStorage(STORAGE_KEYS.houses, []);
+  const seen = new Set();
+  state.houses = [];
+
+  if (!Array.isArray(rawHouses)) {
+    return;
+  }
+
+  for (const rawHouse of rawHouses) {
+    const house = sanitizeHouse(rawHouse);
+    if (!house) {
+      continue;
+    }
+
+    if (house.memberIds.some((id) => seen.has(id))) {
+      continue;
+    }
+
+    house.memberIds.forEach((id) => seen.add(id));
+    state.houses.push(house);
+  }
+}
+
 function restoreTeamIds() {
   const savedIds = readStorage(STORAGE_KEYS.teamIds, null);
   const fallbackGroupIds = readStorage(STORAGE_KEYS.groupIds, []);
   const ids = Array.isArray(savedIds) ? savedIds : fallbackGroupIds;
+  const assignedIds = getAssignedPokemonIdsSet();
   state.teamIds = ids.filter((id) => typeof id === 'string' && state.pokemonById.has(id));
-  state.teamIds = state.teamIds.filter((id) => state.ownedIds.includes(id));
+  state.teamIds = state.teamIds.filter((id) => state.ownedIds.includes(id) && !assignedIds.has(id));
+}
+
+function restoreHouseCounter() {
+  const raw = readStorage(STORAGE_KEYS.houseCounter, 0);
+  state.houseCounter = Number.isInteger(raw) ? raw : 0;
 }
 
 function saveOwnedIds() {
@@ -434,6 +545,11 @@ function saveOwnedIds() {
 function saveTeamIds() {
   writeStorage(STORAGE_KEYS.teamIds, state.teamIds);
   writeStorage(STORAGE_KEYS.groupIds, state.teamIds);
+}
+
+function saveHouses() {
+  writeStorage(STORAGE_KEYS.houses, state.houses);
+  writeStorage(STORAGE_KEYS.houseCounter, state.houseCounter);
 }
 
 function populateRequirementSelects() {
@@ -512,6 +628,7 @@ function renderCatalogList() {
   state.filteredCatalogIds = filteredPokemon.map((pokemon) => pokemon.id);
   const selected = new Set([...elements.catalogList.querySelectorAll("input[type='checkbox']:checked")].map((input) => input.value));
   const ownedSet = new Set(state.ownedIds);
+  const assignedSet = getAssignedPokemonIdsSet();
   elements.catalogList.innerHTML = '';
 
   if (!filteredPokemon.length) {
@@ -529,12 +646,15 @@ function renderCatalogList() {
     checkbox.value = pokemon.id;
     checkbox.checked = selected.has(pokemon.id);
 
+    const ownershipLabel = ownedSet.has(pokemon.id) ? (assignedSet.has(pokemon.id) ? 'In House' : 'Owned') : 'Not owned';
+    const ownershipClass = ownedSet.has(pokemon.id) ? 'owned' : 'unowned';
+
     const info = document.createElement('div');
     info.className = 'catalog-item-body';
     info.innerHTML = `
       <div class="catalog-title-row">
         <strong>${pokemon.label}</strong>
-        <span class="ownership-badge ${ownedSet.has(pokemon.id) ? 'owned' : 'unowned'}">${ownedSet.has(pokemon.id) ? 'Owned' : 'Not owned'}</span>
+        <span class="ownership-badge ${ownershipClass}">${ownershipLabel}</span>
       </div>
       <p><strong>Habitat:</strong> ${pokemon.idealHabitat || 'Unknown'}</p>
       <p><strong>Specialties:</strong> ${listToText(pokemon.specialties)}</p>
@@ -547,6 +667,19 @@ function renderCatalogList() {
   }
 
   updateCatalogSelectionCount();
+}
+
+function sortOwnedIds() {
+  state.ownedIds.sort((a, b) => {
+    const aPokemon = state.pokemonById.get(a);
+    const bPokemon = state.pokemonById.get(b);
+    const aDex = Number.isInteger(aPokemon?.dexNumber) ? aPokemon.dexNumber : 9999;
+    const bDex = Number.isInteger(bPokemon?.dexNumber) ? bPokemon.dexNumber : 9999;
+    if (aDex !== bDex) {
+      return aDex - bDex;
+    }
+    return String(aPokemon?.name || '').localeCompare(String(bPokemon?.name || ''));
+  });
 }
 
 function addOwnedPokemonById(id) {
@@ -566,16 +699,7 @@ function addOwnedPokemonByIds(ids) {
   }
 
   if (added > 0) {
-    state.ownedIds.sort((a, b) => {
-      const aPokemon = state.pokemonById.get(a);
-      const bPokemon = state.pokemonById.get(b);
-      const aDex = Number.isInteger(aPokemon?.dexNumber) ? aPokemon.dexNumber : 9999;
-      const bDex = Number.isInteger(bPokemon?.dexNumber) ? bPokemon.dexNumber : 9999;
-      if (aDex !== bDex) {
-        return aDex - bDex;
-      }
-      return String(aPokemon?.name || '').localeCompare(String(bPokemon?.name || ''));
-    });
+    sortOwnedIds();
     saveOwnedIds();
     refreshAllViews();
   }
@@ -584,6 +708,12 @@ function addOwnedPokemonByIds(ids) {
 }
 
 function removeOwnedPokemonById(id) {
+  const assignedIds = getAssignedPokemonIdsSet();
+  if (assignedIds.has(id)) {
+    elements.importFeedback.textContent = 'Release the House containing that Pokémon before removing it from your Pokédex.';
+    return;
+  }
+
   const nextOwned = state.ownedIds.filter((ownedId) => ownedId !== id);
   if (nextOwned.length === state.ownedIds.length) {
     return;
@@ -597,19 +727,23 @@ function removeOwnedPokemonById(id) {
 }
 
 function clearOwnedDex() {
-  if (!state.ownedIds.length) {
+  if (!state.ownedIds.length && !state.houses.length && !state.teamIds.length) {
     return;
   }
   state.ownedIds = [];
   state.teamIds = [];
+  state.houses = [];
+  state.houseCounter = 0;
   saveOwnedIds();
   saveTeamIds();
+  saveHouses();
   refreshAllViews();
-  elements.importFeedback.textContent = 'Owned list cleared. Squad cleared too.';
+  elements.importFeedback.textContent = 'Owned list, Houses, and active squad cleared.';
 }
 
 function addPokemonToTeam(id) {
-  if (!id || state.teamIds.includes(id) || !state.ownedIds.includes(id)) {
+  const assignedIds = getAssignedPokemonIdsSet();
+  if (!id || state.teamIds.includes(id) || !state.ownedIds.includes(id) || assignedIds.has(id)) {
     return false;
   }
   state.teamIds.push(id);
@@ -640,7 +774,7 @@ function clearTeam() {
 function getFilteredOwnedPokemon() {
   const query = normalizeText(elements.ownedSearch.value).replace(/^#/, '');
   const teamSet = new Set(state.teamIds);
-  const ownedPokemon = getOwnedPokemon();
+  const ownedPokemon = getAvailableOwnedPokemon();
 
   return ownedPokemon.filter((pokemon) => {
     if (teamSet.has(pokemon.id)) {
@@ -654,19 +788,19 @@ function getFilteredOwnedPokemon() {
 }
 
 function renderOwnedDex() {
-  const ownedPokemon = getOwnedPokemon();
+  const availableOwnedPokemon = getAvailableOwnedPokemon();
   const filtered = getFilteredOwnedPokemon();
   state.filteredOwnedIds = filtered.map((pokemon) => pokemon.id);
   elements.ownedDexList.innerHTML = '';
-  elements.ownedDexEmpty.classList.toggle('hidden', ownedPokemon.length > 0);
+  elements.ownedDexEmpty.classList.toggle('hidden', availableOwnedPokemon.length > 0);
   elements.ownedSearchSummary.textContent = `${filtered.length} available`;
 
-  if (!ownedPokemon.length) {
+  if (!availableOwnedPokemon.length) {
     return;
   }
 
   if (!filtered.length) {
-    elements.ownedDexList.innerHTML = '<div class="empty-inline">No owned Pokémon match this search, or they are already in the squad.</div>';
+    elements.ownedDexList.innerHTML = '<div class="empty-inline">No available Pokémon match this search, or they are already in the active squad.</div>';
     return;
   }
 
@@ -679,7 +813,7 @@ function renderOwnedDex() {
           <p class="owned-card-name">${pokemon.label}</p>
           <p class="owned-card-meta">Habitat: ${pokemon.idealHabitat || 'Unknown'} · Specialties: ${listToText(pokemon.specialties)}</p>
         </div>
-        <span class="ownership-badge owned">Owned</span>
+        <span class="ownership-badge owned">Available</span>
       </div>
       <p class="owned-card-favorites">Favorites: ${listToText(pokemon.favorites.slice(0, 4))}${pokemon.favorites.length > 4 ? ', …' : ''}</p>
       <div class="owned-card-actions">
@@ -695,6 +829,7 @@ function renderTeam() {
   const members = getTeamMembers();
   elements.teamList.innerHTML = '';
   elements.teamEmpty.classList.toggle('hidden', members.length > 0);
+  elements.saveHouse.disabled = members.length === 0;
 
   if (!members.length) {
     elements.toggleOverlap.disabled = true;
@@ -742,6 +877,8 @@ function renderTeamInsights(groupMembers = getTeamMembers()) {
   elements.favoritesOverlapMeta.textContent = topFavorite
     ? `Top overlap: ${topFavorite.label} (${topFavorite.count} squad members).`
     : 'No shared favorites in the current squad.';
+
+  return summary;
 }
 
 function candidateMatchesRequirements(candidate, requirements) {
@@ -799,6 +936,7 @@ function runRecommendation() {
   const teamMembers = getTeamMembers();
   const ownedSet = new Set(state.ownedIds);
   const teamSet = new Set(state.teamIds);
+  const eligibleSet = new Set(getRecommendationEligibleIds());
   const requirements = getCurrentRequirements();
   const limit = Number(elements.resultCount.value);
   const importanceRatio = getImportanceRatio();
@@ -806,7 +944,7 @@ function runRecommendation() {
   const rows = [];
 
   for (const candidate of state.sortedPokemon) {
-    if (teamSet.has(candidate.id)) {
+    if (!eligibleSet.has(candidate.id) || teamSet.has(candidate.id)) {
       continue;
     }
     if (ownedOnly && !ownedSet.has(candidate.id)) {
@@ -850,8 +988,8 @@ function runRecommendation() {
   }
 
   for (const [index, row] of topRows.entries()) {
-    const tr = document.createElement('tr');
     const actionLabel = row.owned ? 'Add to squad' : 'Add to Pokédex';
+    const tr = document.createElement('tr');
     tr.innerHTML = `
       <td data-label="Rank">${index + 1}</td>
       <td data-label="Pokémon">${row.candidate.label}</td>
@@ -874,29 +1012,311 @@ function runRecommendation() {
   saveRequirements();
 }
 
+function getHouseDisplayName(house) {
+  return house.name || `House ${house.id}`;
+}
+
+function buildDefaultHouseName() {
+  state.houseCounter += 1;
+  saveHouses();
+  return `House ${state.houseCounter}`;
+}
+
+function createHouseRecord({ name, memberIds, source, sizeRange }) {
+  const members = memberIds.map((id) => state.pokemonById.get(id)).filter(Boolean);
+  const summary = computeGroupScoreSummary(members, getImportanceRatio());
+  return {
+    id: `house-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    name: String(name || '').trim() || buildDefaultHouseName(),
+    memberIds: [...memberIds],
+    stackedScore: summary.stackedCombined,
+    simpleScore: summary.simpleCombined,
+    rating: buildHouseRating(summary),
+    createdAt: new Date().toISOString(),
+    source,
+    sizeRange: sizeRange || null,
+  };
+}
+
+function saveCurrentTeamAsHouse() {
+  const memberIds = [...state.teamIds];
+  if (!memberIds.length) {
+    elements.houseSaveFeedback.textContent = 'Add Pokémon to the active squad before saving a House.';
+    return;
+  }
+
+  const house = createHouseRecord({
+    name: elements.houseNameInput.value,
+    memberIds,
+    source: 'manual',
+  });
+
+  state.houses.unshift(house);
+  state.teamIds = [];
+  saveHouses();
+  saveTeamIds();
+  elements.houseNameInput.value = '';
+  elements.houseSaveFeedback.textContent = `${getHouseDisplayName(house)} saved. ${house.memberIds.length} Pokémon are now locked into that House.`;
+  refreshAllViews();
+}
+
+function releaseHouseById(id) {
+  const nextHouses = state.houses.filter((house) => house.id !== id);
+  if (nextHouses.length === state.houses.length) {
+    return;
+  }
+
+  state.houses = nextHouses;
+  saveHouses();
+  refreshAllViews();
+}
+
+function clearHouses() {
+  if (!state.houses.length) {
+    elements.autoHouseFeedback.textContent = 'There are no Houses to release.';
+    return;
+  }
+
+  state.houses = [];
+  saveHouses();
+  refreshAllViews();
+  elements.autoHouseFeedback.textContent = 'All Houses released. Their Pokémon are available again.';
+}
+
+function evaluateHouseCandidate(memberIds) {
+  const members = memberIds.map((id) => state.pokemonById.get(id)).filter(Boolean);
+  const summary = computeGroupScoreSummary(members, getImportanceRatio());
+  const habitatRows = summary.habitat.overlapRows.length;
+  const favoriteRows = summary.favorites.overlapRows.length;
+
+  return {
+    memberIds,
+    members,
+    summary,
+    heuristic: summary.stackedCombined + summary.simpleCombined * 0.35 + habitatRows * 0.25 + favoriteRows * 0.25,
+  };
+}
+
+function compareHouseCandidates(a, b) {
+  if (b.heuristic !== a.heuristic) {
+    return b.heuristic - a.heuristic;
+  }
+  if (b.summary.stackedCombined !== a.summary.stackedCombined) {
+    return b.summary.stackedCombined - a.summary.stackedCombined;
+  }
+  if (b.summary.simpleCombined !== a.summary.simpleCombined) {
+    return b.summary.simpleCombined - a.summary.simpleCombined;
+  }
+  if (b.memberIds.length !== a.memberIds.length) {
+    return b.memberIds.length - a.memberIds.length;
+  }
+  return a.members.map((member) => member.label).join('|').localeCompare(b.members.map((member) => member.label).join('|'));
+}
+
+function isBetterHouseCandidate(candidate, incumbent) {
+  if (!incumbent) {
+    return true;
+  }
+  return compareHouseCandidates(candidate, incumbent) < 0;
+}
+
+function generateBestHouseFromRange(minSize, maxSize) {
+  const availablePool = getAvailableOwnedPokemon().filter((pokemon) => !state.teamIds.includes(pokemon.id));
+  if (availablePool.length < minSize) {
+    return null;
+  }
+
+  let bestCandidate = null;
+
+  for (const seed of availablePool) {
+    let group = [seed];
+    const remainingIds = new Set(availablePool.filter((pokemon) => pokemon.id !== seed.id).map((pokemon) => pokemon.id));
+
+    if (group.length >= minSize) {
+      const evaluatedSeed = evaluateHouseCandidate(group.map((member) => member.id));
+      if (isBetterHouseCandidate(evaluatedSeed, bestCandidate)) {
+        bestCandidate = evaluatedSeed;
+      }
+    }
+
+    while (group.length < maxSize && remainingIds.size > 0) {
+      let bestNextEvaluation = null;
+      let bestNextId = null;
+
+      for (const id of remainingIds) {
+        const nextMembers = [...group, state.pokemonById.get(id)].filter(Boolean);
+        const evaluated = evaluateHouseCandidate(nextMembers.map((member) => member.id));
+        if (isBetterHouseCandidate(evaluated, bestNextEvaluation)) {
+          bestNextEvaluation = evaluated;
+          bestNextId = id;
+        }
+      }
+
+      if (!bestNextId) {
+        break;
+      }
+
+      group.push(state.pokemonById.get(bestNextId));
+      remainingIds.delete(bestNextId);
+
+      if (group.length >= minSize) {
+        const evaluatedGroup = evaluateHouseCandidate(group.map((member) => member.id));
+        if (isBetterHouseCandidate(evaluatedGroup, bestCandidate)) {
+          bestCandidate = evaluatedGroup;
+        }
+      }
+    }
+  }
+
+  return bestCandidate;
+}
+
+function normalizeAutoHouseRange() {
+  const availableCount = getAvailableOwnedPokemon().filter((pokemon) => !state.teamIds.includes(pokemon.id)).length;
+  let minSize = Number.parseInt(elements.autoHouseMin.value, 10);
+  let maxSize = Number.parseInt(elements.autoHouseMax.value, 10);
+
+  if (!Number.isFinite(minSize)) {
+    minSize = 2;
+  }
+  if (!Number.isFinite(maxSize)) {
+    maxSize = minSize;
+  }
+
+  minSize = Math.max(1, Math.min(10, minSize));
+  maxSize = Math.max(1, Math.min(10, maxSize));
+  if (minSize > maxSize) {
+    [minSize, maxSize] = [maxSize, minSize];
+  }
+
+  maxSize = Math.min(maxSize, availableCount || maxSize);
+  minSize = Math.min(minSize, maxSize);
+
+  elements.autoHouseMin.value = String(minSize);
+  elements.autoHouseMax.value = String(maxSize);
+
+  return { minSize, maxSize, availableCount };
+}
+
+function generateAutoHouse() {
+  const { minSize, maxSize, availableCount } = normalizeAutoHouseRange();
+
+  if (!availableCount || availableCount < minSize) {
+    elements.autoHouseFeedback.textContent = 'Not enough unassigned owned Pokémon are available for that size range.';
+    return;
+  }
+
+  const best = generateBestHouseFromRange(minSize, maxSize);
+  if (!best || best.memberIds.length < minSize) {
+    elements.autoHouseFeedback.textContent = 'No valid House could be generated from the current available pool.';
+    return;
+  }
+
+  const house = createHouseRecord({
+    name: elements.autoHouseName.value,
+    memberIds: best.memberIds,
+    source: 'auto',
+    sizeRange: { min: minSize, max: maxSize },
+  });
+
+  state.houses.unshift(house);
+  saveHouses();
+  elements.autoHouseName.value = '';
+  elements.autoHouseFeedback.textContent = `${getHouseDisplayName(house)} generated with ${house.memberIds.length} Pokémon. Rating ${house.rating}, stacked synergy ${house.stackedScore.toFixed(2)}.`;
+  refreshAllViews();
+}
+
+function renderHouses() {
+  elements.houseList.innerHTML = '';
+  elements.housesEmpty.classList.toggle('hidden', state.houses.length > 0);
+  elements.houseRosterSummary.textContent = `${state.houses.length} ${state.houses.length === 1 ? 'House' : 'Houses'}`;
+  elements.clearHouses.disabled = state.houses.length === 0;
+
+  if (!state.houses.length) {
+    return;
+  }
+
+  for (const house of state.houses) {
+    const members = getHouseMembers(house);
+    const article = document.createElement('article');
+    article.className = 'house-card';
+    article.innerHTML = `
+      <div class="house-card-top">
+        <div>
+          <p class="house-card-kicker">${house.source === 'auto' ? 'Auto-generated House' : 'Saved from active squad'}</p>
+          <h3>${getHouseDisplayName(house)}</h3>
+        </div>
+        <div class="house-badge-stack">
+          <span class="rating-badge">Rating ${house.rating}</span>
+          <span class="pill">${members.length} Pokémon</span>
+        </div>
+      </div>
+
+      <div class="house-score-grid">
+        <div class="score-chip">
+          <span>Stacked synergy</span>
+          <strong>${house.stackedScore.toFixed(2)}</strong>
+        </div>
+        <div class="score-chip">
+          <span>Simple synergy</span>
+          <strong>${house.simpleScore.toFixed(2)}</strong>
+        </div>
+      </div>
+
+      <p class="hint tiny-text">${house.sizeRange ? `Generated within size range ${house.sizeRange.min}-${house.sizeRange.max}. ` : ''}Created ${new Date(house.createdAt).toLocaleString()}.</p>
+
+      <ul class="house-member-list">
+        ${members
+          .map(
+            (member) => `
+            <li>
+              <strong>${member.label}</strong>
+              <span>${member.idealHabitat || 'Unknown habitat'}</span>
+            </li>
+          `,
+          )
+          .join('')}
+      </ul>
+
+      <button type="button" class="ghost release-house" data-id="${house.id}">Release House</button>
+    `;
+    elements.houseList.appendChild(article);
+  }
+}
+
 function updateDashboard(topRow, totalMatches) {
   const totalPokemon = state.sortedPokemon.length || 1;
   const ownedCount = state.ownedIds.length;
+  const availableCount = getAvailableOwnedIds().length;
+  const houseCount = state.houses.length;
+  const assignedCount = [...getAssignedPokemonIdsSet()].length;
   const teamCount = state.teamIds.length;
   const ownedOnly = getOwnedOnlyMode();
   const coverage = ((ownedCount / totalPokemon) * 100).toFixed(1);
 
   elements.ownedCountHero.textContent = String(ownedCount);
+  elements.availableCountHero.textContent = String(availableCount);
+  elements.houseCountHero.textContent = String(houseCount);
   elements.teamCountHero.textContent = String(teamCount);
-  elements.recommendationModeHero.textContent = ownedOnly ? 'Owned only' : 'Owned + unowned';
   elements.ownedCountStat.textContent = String(ownedCount);
   elements.ownedCoverageStat.textContent = `${coverage}% of all Pokopia Pokémon`;
+  elements.availableCountStat.textContent = String(availableCount);
+  elements.availableSummaryStat.textContent = availableCount ? `${availableCount} unassigned Pokémon ready` : 'No unassigned Pokémon left';
+  elements.houseCountStat.textContent = String(houseCount);
+  elements.houseSummaryStat.textContent = houseCount ? `${assignedCount} Pokémon locked across Houses` : 'No saved Houses yet';
   elements.teamCountStat.textContent = String(teamCount);
-  elements.teamSummaryStat.textContent = teamCount ? `${teamCount} Pokémon in squad` : 'Add Pokémon to build a squad';
+  elements.teamSummaryStat.textContent = teamCount ? `${teamCount} Pokémon in active squad` : 'Add Pokémon to build a squad';
   elements.recommendationModeStat.textContent = ownedOnly ? 'Owned only' : 'All Pokémon';
   elements.unownedVisibleStat.textContent = ownedOnly ? 'Unowned hidden' : 'Unowned visible';
 
   if (!ownedCount) {
     elements.plannerInsight.textContent = 'Add owned Pokémon to start building.';
+  } else if (!availableCount && !teamCount) {
+    elements.plannerInsight.textContent = 'All owned Pokémon are currently locked into Houses.';
   } else if (!teamCount) {
-    elements.plannerInsight.textContent = 'Choose squad members from your owned list.';
+    elements.plannerInsight.textContent = 'Choose available Pokémon for the active squad, or auto-generate a House.';
   } else {
-    elements.plannerInsight.textContent = `${totalMatches} candidates match the current filters.`;
+    elements.plannerInsight.textContent = `${totalMatches} candidates match the current filters for the active squad.`;
   }
 
   if (!topRow) {
@@ -909,6 +1329,7 @@ function refreshAllViews() {
   renderCatalogList();
   renderOwnedDex();
   renderTeam();
+  renderHouses();
   runRecommendation();
 }
 
@@ -1009,21 +1430,24 @@ function handleRecommendationAction(button) {
   if (isOwned) {
     const added = addPokemonToTeam(id);
     elements.importFeedback.textContent = added
-      ? 'Added the recommended Pokémon to your squad.'
-      : 'That Pokémon is already in your squad.';
+      ? 'Added the recommended Pokémon to your active squad.'
+      : 'That Pokémon is already in your squad or locked into a House.';
     return;
   }
 
   addOwnedPokemonByIds([id]);
   const addedToTeam = addPokemonToTeam(id);
   elements.importFeedback.textContent = addedToTeam
-    ? 'Added the recommended Pokémon to your owned list and squad.'
+    ? 'Added the recommended Pokémon to your owned list and active squad.'
     : 'Added the recommended Pokémon to your owned list.';
 }
 
 function bindEvents() {
   elements.jumpToImport.addEventListener('click', () => {
     elements.importSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
+  elements.jumpToHouses.addEventListener('click', () => {
+    elements.housesSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
   });
   elements.jumpToRecommendations.addEventListener('click', () => {
     elements.recommendationsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -1048,7 +1472,7 @@ function bindEvents() {
     const addButton = event.target.closest('button.add-to-team');
     if (addButton) {
       const added = addPokemonToTeam(addButton.dataset.id);
-      elements.importFeedback.textContent = added ? 'Added Pokémon to your squad.' : 'That Pokémon is already in your squad.';
+      elements.importFeedback.textContent = added ? 'Added Pokémon to your active squad.' : 'That Pokémon is already in your squad.';
       return;
     }
 
@@ -1060,6 +1484,7 @@ function bindEvents() {
   });
 
   elements.clearTeam.addEventListener('click', clearTeam);
+  elements.saveHouse.addEventListener('click', saveCurrentTeamAsHouse);
   elements.teamList.addEventListener('click', (event) => {
     const removeButton = event.target.closest('button.remove-team');
     if (!removeButton) {
@@ -1075,12 +1500,22 @@ function bindEvents() {
     setOverlapPanelVisibility(!state.groupOverlapVisible);
   });
 
+  elements.autoGenerateHouse.addEventListener('click', generateAutoHouse);
+  elements.clearHouses.addEventListener('click', clearHouses);
+  elements.houseList.addEventListener('click', (event) => {
+    const releaseButton = event.target.closest('button.release-house');
+    if (!releaseButton) {
+      return;
+    }
+    releaseHouseById(releaseButton.dataset.id);
+  });
+
   elements.ownedOnlyToggle.addEventListener('change', runRecommendation);
   elements.requiredHabitat.addEventListener('change', runRecommendation);
   elements.resultCount.addEventListener('change', runRecommendation);
   elements.importanceRatio.addEventListener('input', () => {
     updateImportanceRatioLabel();
-    runRecommendation();
+    refreshAllViews();
   });
   elements.clearSpecialties.addEventListener('click', clearSpecialtiesSelection);
   elements.requiredSpecialtiesBox.addEventListener('change', () => {
@@ -1120,6 +1555,8 @@ async function init() {
     populateRequirementSelects();
     restoreRequirements();
     restoreOwnedIds();
+    restoreHouseCounter();
+    restoreHouses();
     restoreTeamIds();
     updateImportanceRatioLabel();
     bindEvents();
