@@ -1,6 +1,6 @@
 # Pokopia Group Planner
 
-A beginner-friendly local web app for building a Pokémon group and recommending which Pokémon to add next.
+A dramatically redesigned local web app for importing your owned Pokémon, building squads from your personal Pokédex, and getting clearer Pokopia recommendations.
 
 ## What this app is
 
@@ -43,9 +43,10 @@ Then open:
 2. Change into this project folder.
 3. Run `python3 run_app.py`.
 4. Open the printed local URL in your browser.
-5. Add Pokémon into **Current Group**.
-6. Adjust the filters and importance slider.
-7. Read the **Recommendations** table for suggested additions.
+5. Import the Pokémon you own into the in-app **Owned Pokédex**.
+6. Build your **Active Squad** from that owned pool.
+7. Adjust the filters, ownership toggle, and importance slider.
+8. Read the **Recommendations** table for suggested additions.
 
 ## What I changed so it works better for personal use
 
@@ -128,3 +129,15 @@ Combined group total uses the same slider weighting:
 - `run_app.py` — simplest way to launch the app locally.
 - `data/pokopia_pokemon.json` — Pokémon data used by the planner.
 - `scripts/scrape_pokopia_pokemon_serebii.py` — optional scraper for refreshing the dataset.
+
+
+## New owned-Pokédex-first workflow
+
+The app now behaves very differently than before:
+
+- **Import first:** when you bulk add or paste Pokémon, they are added to your in-app owned Pokédex.
+- **Build from owned:** the active squad builder now pulls from your owned Pokédex instead of the full master list.
+- **Recommend from owned by default:** recommendations now default to Pokémon you already own.
+- **Optional expansion:** a toggle in the recommendation controls can include unowned Pokémon when you want to scout outside your collection.
+
+This makes the planner much more practical for real play, because the default experience is now centered on Pokémon you actually have available.
