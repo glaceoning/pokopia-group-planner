@@ -295,6 +295,10 @@ h3 {
   gap: 0.75rem;
 }
 
+.mobile-section-nav {
+  display: none;
+}
+
 .stat-card,
 .glass-card,
 .score-summary-card,
@@ -680,6 +684,10 @@ h3 {
   overflow-x: auto;
 }
 
+.mobile-hidden-section {
+  display: none !important;
+}
+
 .card-surface {
   padding: 0.35rem;
 }
@@ -741,6 +749,200 @@ tr:hover td {
   }
 }
 
+@media (max-width: 900px) {
+  body {
+    padding-bottom: 6rem;
+  }
+
+  button,
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
+
+  button {
+    min-height: 3rem;
+  }
+
+  .hero {
+    gap: 1.25rem;
+  }
+
+  .hero-copy {
+    gap: 0.75rem;
+  }
+
+  .hero-summary,
+  .stat-grid.overview-grid {
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(170px, 78%);
+    overflow-x: auto;
+    padding-bottom: 0.2rem;
+    scroll-snap-type: x proximity;
+  }
+
+  .hero-summary .stat-card,
+  .stat-grid.overview-grid .stat-card {
+    scroll-snap-align: start;
+  }
+
+  .mobile-section-nav {
+    display: grid;
+    gap: 0.6rem;
+    position: sticky;
+    bottom: 0.75rem;
+    z-index: 30;
+    padding: 0.85rem;
+    background: rgba(11, 18, 32, 0.92);
+    border: 1px solid var(--border);
+    border-radius: 22px;
+    backdrop-filter: blur(18px);
+    box-shadow: 0 18px 40px rgba(0, 0, 0, 0.34);
+  }
+
+  .mobile-section-hint {
+    font-size: 0.76rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--muted);
+  }
+
+  .mobile-section-track {
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(88px, 1fr);
+    gap: 0.55rem;
+    overflow-x: auto;
+  }
+
+  .mobile-section-button {
+    min-height: 2.85rem;
+    padding: 0.72rem 0.85rem;
+    border-radius: 16px;
+    background: rgba(255, 255, 255, 0.04);
+    color: var(--muted-strong);
+    border: 1px solid var(--border);
+    box-shadow: none;
+    font-size: 0.88rem;
+    font-weight: 700;
+  }
+
+  .mobile-section-button.is-active {
+    background: linear-gradient(135deg, var(--accent-strong), #7dd3fc);
+    color: #042f2e;
+    border-color: transparent;
+    box-shadow: 0 10px 24px rgba(45, 212, 191, 0.22);
+  }
+
+  .toolbar-actions,
+  .hero-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    justify-content: stretch;
+  }
+
+  .hero-actions button:first-child,
+  .toolbar-actions button:first-child {
+    grid-column: 1 / -1;
+  }
+
+  .catalog-list,
+  .owned-dex-list,
+  .team-list,
+  .house-list,
+  .check-grid {
+    max-height: none;
+    overflow: visible;
+  }
+
+  .workspace-grid > .squad-panel {
+    order: -1;
+  }
+
+  .score-summary-grid,
+  .owned-card-actions,
+  .house-score-grid,
+  .house-form-grid,
+  .range-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .score-summary-card,
+  .segment-info,
+  .insight-banner,
+  .house-save-card,
+  .recommendation-controls,
+  .table-wrap {
+    border-radius: 20px;
+  }
+
+  .table-wrap {
+    overflow: visible;
+  }
+
+  table,
+  thead,
+  tbody,
+  tr,
+  td {
+    display: block;
+  }
+
+  thead {
+    display: none;
+  }
+
+  table {
+    min-width: 0;
+  }
+
+  tbody {
+    display: grid;
+    gap: 0.85rem;
+  }
+
+  tr {
+    padding: 1rem;
+    border: 1px solid rgba(148, 163, 184, 0.14);
+    border-radius: var(--radius-lg);
+    background: rgba(255, 255, 255, 0.03);
+  }
+
+  tr:hover td {
+    background: transparent;
+  }
+
+  td {
+    display: flex;
+    justify-content: space-between;
+    gap: 0.9rem;
+    padding: 0.35rem 0;
+    border-bottom: 1px solid rgba(148, 163, 184, 0.1);
+    font-size: 0.92rem;
+  }
+
+  td:last-child {
+    border-bottom: none;
+    padding-bottom: 0;
+  }
+
+  td::before {
+    content: attr(data-label);
+    flex: 0 0 6.5rem;
+    color: var(--muted);
+    font-size: 0.73rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+
+  td[data-label='Action'] button {
+    width: 100%;
+  }
+}
+
 @media (max-width: 780px) {
   body {
     font-size: 15px;
@@ -791,7 +993,40 @@ tr:hover td {
     grid-template-columns: 1fr;
   }
 
-  table {
-    min-width: 860px;
+  .section-heading {
+    gap: 0.8rem;
+  }
+
+  .toolbar-actions,
+  .inline-actions,
+  .hero-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .toolbar-actions button,
+  .inline-actions button,
+  .hero-actions button,
+  .owned-card-actions button,
+  .house-form-grid button,
+  .range-grid button {
+    width: 100%;
+  }
+
+  .catalog-item,
+  .owned-card,
+  .team-item,
+  .house-card,
+  tr {
+    padding: 0.9rem;
+  }
+
+  td {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.35rem;
+  }
+
+  td::before {
+    flex-basis: auto;
   }
 }

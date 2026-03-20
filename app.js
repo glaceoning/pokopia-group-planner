@@ -29,6 +29,7 @@ const state = {
   filteredOwnedIds: [],
   groupOverlapVisible: false,
   lastRecommendationRows: [],
+  mobileSection: 'overview',
 };
 
 const elements = {
@@ -57,6 +58,8 @@ const elements = {
   recommendationModeStat: document.querySelector('#recommendationModeStat'),
   unownedVisibleStat: document.querySelector('#unownedVisibleStat'),
   plannerInsight: document.querySelector('#plannerInsight'),
+  overviewSection: document.querySelector('#overviewSection'),
+  workspaceSection: document.querySelector('#workspaceSection'),
   catalogSearch: document.querySelector('#catalogSearch'),
   catalogList: document.querySelector('#catalogList'),
   catalogSelectionCount: document.querySelector('#catalogSelectionCount'),
@@ -108,7 +111,71 @@ const elements = {
   spotlightSummary: document.querySelector('#spotlightSummary'),
   resultsBody: document.querySelector('#resultsBody'),
   status: document.querySelector('#status'),
+  mobileSectionNav: document.querySelector('.mobile-section-nav'),
+  mobileSectionButtons: [...document.querySelectorAll('.mobile-section-button')],
 };
+
+const mobileLayoutQuery = window.matchMedia('(max-width: 900px)');
+
+function getMobileSections() {
+  return {
+    overview: elements.overviewSection,
+    import: elements.importSection,
+    squad: elements.workspaceSection,
+    houses: elements.housesSection,
+    recommendations: elements.recommendationsSection,
+  };
+}
+
+function isMobileLayout() {
+  return mobileLayoutQuery.matches;
+}
+
+function syncMobileSectionVisibility() {
+  const sections = getMobileSections();
+  const mobileEnabled = isMobileLayout();
+
+  document.body.classList.toggle('mobile-sections-active', mobileEnabled);
+
+  for (const [key, section] of Object.entries(sections)) {
+    if (!section) {
+      continue;
+    }
+    section.classList.toggle('mobile-hidden-section', mobileEnabled && state.mobileSection !== key);
+  }
+
+  elements.mobileSectionButtons.forEach((button) => {
+    const active = button.dataset.mobileTarget === state.mobileSection;
+    button.classList.toggle('is-active', active);
+    button.setAttribute('aria-pressed', active ? 'true' : 'false');
+  });
+}
+
+function setMobileSection(sectionKey, options = {}) {
+  if (!getMobileSections()[sectionKey]) {
+    return;
+  }
+
+  const { scroll = true } = options;
+  state.mobileSection = sectionKey;
+  syncMobileSectionVisibility();
+
+  if (!isMobileLayout() || !scroll) {
+    return;
+  }
+
+  getMobileSections()[sectionKey]?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function navigateToSection(sectionKey) {
+  const targetSection = getMobileSections()[sectionKey];
+  if (!targetSection) {
+    return;
+  }
+
+  setMobileSection(sectionKey, { scroll: false });
+  targetSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
 
 function normalizeText(value) {
   return String(value ?? '')
@@ -1058,6 +1125,7 @@ function saveCurrentTeamAsHouse() {
   elements.houseNameInput.value = '';
   elements.houseSaveFeedback.textContent = `${getHouseDisplayName(house)} saved. ${house.memberIds.length} Pokémon are now locked into that House.`;
   refreshAllViews();
+  setMobileSection('houses', { scroll: true });
 }
 
 function releaseHouseById(id) {
@@ -1224,6 +1292,7 @@ function generateAutoHouse() {
   elements.autoHouseName.value = '';
   elements.autoHouseFeedback.textContent = `${getHouseDisplayName(house)} generated with ${house.memberIds.length} Pokémon. Rating ${house.rating}, stacked synergy ${house.stackedScore.toFixed(2)}.`;
   refreshAllViews();
+  setMobileSection('houses', { scroll: true });
 }
 
 function renderHouses() {
@@ -1421,6 +1490,9 @@ function addSelectedCatalogPokemon() {
   elements.importFeedback.textContent = added
     ? `Added ${added} Pokémon to your owned list.`
     : 'Those Pokémon were already in your owned list.';
+  if (added) {
+    setMobileSection('squad', { scroll: true });
+  }
 }
 
 function handleRecommendationAction(button) {
@@ -1432,6 +1504,9 @@ function handleRecommendationAction(button) {
     elements.importFeedback.textContent = added
       ? 'Added the recommended Pokémon to your active squad.'
       : 'That Pokémon is already in your squad or locked into a House.';
+    if (added) {
+      setMobileSection('squad', { scroll: true });
+    }
     return;
   }
 
@@ -1440,18 +1515,34 @@ function handleRecommendationAction(button) {
   elements.importFeedback.textContent = addedToTeam
     ? 'Added the recommended Pokémon to your owned list and active squad.'
     : 'Added the recommended Pokémon to your owned list.';
+  if (addedToTeam) {
+    setMobileSection('squad', { scroll: true });
+  }
 }
 
 function bindEvents() {
   elements.jumpToImport.addEventListener('click', () => {
-    elements.importSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    navigateToSection('import');
   });
   elements.jumpToHouses.addEventListener('click', () => {
-    elements.housesSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    navigateToSection('houses');
   });
   elements.jumpToRecommendations.addEventListener('click', () => {
-    elements.recommendationsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    navigateToSection('recommendations');
   });
+
+  elements.mobileSectionButtons.forEach((button) => {
+    button.addEventListener('click', () => {
+      navigateToSection(button.dataset.mobileTarget);
+    });
+  });
+
+  const handleMobileLayoutChange = () => syncMobileSectionVisibility();
+  if (typeof mobileLayoutQuery.addEventListener === 'function') {
+    mobileLayoutQuery.addEventListener('change', handleMobileLayoutChange);
+  } else {
+    mobileLayoutQuery.addListener(handleMobileLayoutChange);
+  }
 
   elements.catalogSearch.addEventListener('input', renderCatalogList);
   elements.catalogList.addEventListener('change', (event) => {
@@ -1473,6 +1564,9 @@ function bindEvents() {
     if (addButton) {
       const added = addPokemonToTeam(addButton.dataset.id);
       elements.importFeedback.textContent = added ? 'Added Pokémon to your active squad.' : 'That Pokémon is already in your squad.';
+      if (added) {
+        setMobileSection('squad', { scroll: true });
+      }
       return;
     }
 
@@ -1560,6 +1654,7 @@ async function init() {
     restoreTeamIds();
     updateImportanceRatioLabel();
     bindEvents();
+    syncMobileSectionVisibility();
     refreshAllViews();
 
     elements.status.textContent = `${state.pokemon.length} Pokémon loaded.`;
