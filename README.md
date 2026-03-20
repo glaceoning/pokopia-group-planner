@@ -1,6 +1,6 @@
 # Pokopia Group Planner
 
-A local web app for importing the Pokémon you own, building a squad, and comparing Pokopia recommendations.
+A local web app for importing the Pokémon you own, building active squads, saving permanent Houses, and comparing Pokopia recommendations.
 
 ## Run locally
 
@@ -21,9 +21,19 @@ Then open <http://localhost:8000>.
 ## How to use the app
 
 1. Add Pokémon to your owned list from the catalog or by pasting a list.
-2. Add owned Pokémon to the squad.
-3. Adjust recommendation filters.
-4. Review the recommendation table and add candidates as needed.
+2. Add available owned Pokémon to the active squad.
+3. Save that squad as a House to permanently lock those Pokémon together, or auto-generate a new House from your unassigned owned Pokémon.
+4. Adjust recommendation filters for the active squad.
+5. Review the recommendation table and add candidates as needed.
+
+
+## Houses workflow
+
+- **Save current squad as a House**: lock the active squad into a saved House, record its synergy score/rating, and clear the active squad so you can build the next one.
+- **Auto-generate a House**: choose a minimum and maximum size, then let the app assemble the best available House from your unassigned owned Pokémon.
+- **Release a House**: unlock its Pokémon so they can be used in future squads or Houses again.
+
+Pokémon assigned to a House are removed from the available pool for manual squad building and from future recommendation results until that House is released.
 
 ## Update the data
 
