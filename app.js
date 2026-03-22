@@ -1,3 +1,16 @@
+import {
+  canonicalizeMapName,
+  clampRatio,
+  matchesRequirements,
+  normalizeImportToken,
+  normalizeMapSet,
+  normalizeText,
+  parseImportTextFromLookup,
+  sanitizeFreeText,
+  setFrom,
+  unique,
+} from './planner-core.mjs';
+
 const HABITAT_CONFLICTING = new Set([
   'bright|dark',
   'dark|bright',
@@ -17,7 +30,7 @@ const STORAGE_KEYS = {
   houseCounter: 'pokopia.houseCounter',
 };
 
-const HOUSE_MAPS = ['Withered Wasteland', 'Bleak Beach', 'Rocky Ridges', 'Sparkling Skylands', 'Pallette Town'];
+const HOUSE_MAPS = ['Withered Wastelands', 'Bleak Beach', 'Rocky Ridges', 'Sparkling Skylands', 'Palette Town', 'Cloud Island'];
 const HOUSE_SIZE_MIN = 1;
 const HOUSE_SIZE_MAX = 4;
 
@@ -114,6 +127,7 @@ const elements = {
   favoritesOverlapMeta: document.querySelector('#favoritesOverlapMeta'),
   favoritesOverlapList: document.querySelector('#favoritesOverlapList'),
   ownedOnlyToggle: document.querySelector('#ownedOnlyToggle'),
+  recommendationMap: document.querySelector('#recommendationMap'),
   requiredHabitat: document.querySelector('#requiredHabitat'),
   requiredSpecialtiesBox: document.querySelector('#requiredSpecialtiesBox'),
   clearSpecialties: document.querySelector('#clearSpecialties'),
@@ -168,13 +182,17 @@ function syncMobileSectionVisibility() {
     if (!section) {
       continue;
     }
-    section.classList.toggle('mobile-hidden-section', mobileEnabled && state.mobileSection !== key);
+    const hiddenOnMobile = mobileEnabled && state.mobileSection !== key;
+    section.classList.toggle('mobile-hidden-section', hiddenOnMobile);
+    section.setAttribute('aria-hidden', hiddenOnMobile ? 'true' : 'false');
   }
 
   elements.mobileSectionButtons.forEach((button) => {
     const active = button.dataset.mobileTarget === state.mobileSection;
     button.classList.toggle('is-active', active);
     button.setAttribute('aria-pressed', active ? 'true' : 'false');
+    button.setAttribute('aria-selected', active ? 'true' : 'false');
+    button.tabIndex = active ? 0 : -1;
   });
 }
 
@@ -204,45 +222,44 @@ function navigateToSection(sectionKey) {
   targetSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
-function normalizeText(value) {
-  return String(value ?? '')
-    .trim()
-    .replace(/\s+/g, ' ')
-    .toLowerCase();
-}
-
-function normalizeImportToken(value) {
-  return normalizeText(value).replace(/^#/, '');
-}
-
-function unique(values) {
-  const seen = new Set();
-  const out = [];
-
-  for (const value of values) {
-    const clean = String(value ?? '').trim();
-    if (!clean || seen.has(clean)) {
-      continue;
-    }
-    seen.add(clean);
-    out.push(clean);
-  }
-
-  return out;
-}
-
-function setFrom(values) {
-  return new Set(values.map(normalizeText).filter(Boolean));
-}
-
 function listToText(values) {
   return values.length ? values.join(', ') : '—';
+}
+
+function createNode(tag, { className = '', text = '', attrs = {} } = {}) {
+  const node = document.createElement(tag);
+  if (className) {
+    node.className = className;
+  }
+  if (text) {
+    node.textContent = text;
+  }
+  Object.entries(attrs).forEach(([key, value]) => {
+    if (value !== undefined && value !== null) {
+      node.setAttribute(key, String(value));
+    }
+  });
+  return node;
+}
+
+function createBadge(className, text) {
+  return createNode('span', { className, text });
+}
+
+function buildMapHint(pokemon, targetMap) {
+  if (!targetMap) {
+    return pokemon.locations.length ? `Maps: ${listToText(pokemon.locations.slice(0, 3))}${pokemon.locations.length > 3 ? ', …' : ''}` : 'Maps unknown';
+  }
+
+  return pokemon.locationNormSet.has(normalizeText(targetMap))
+    ? `${pokemon.name} is available on ${targetMap}.`
+    : `${pokemon.name} is not available on ${targetMap}.`;
 }
 
 function mapPokemon(raw) {
   const specialties = unique(Array.isArray(raw.specialties) ? raw.specialties : []);
   const favorites = unique(Array.isArray(raw.favorites) ? raw.favorites : []);
-  const locations = unique(Array.isArray(raw.locations) ? raw.locations : []);
+  const locations = normalizeMapSet(Array.isArray(raw.locations) ? raw.locations : []);
   const dexNumber = Number.isInteger(raw.dex_number) ? raw.dex_number : null;
   const dexPadded = dexNumber !== null ? String(dexNumber).padStart(3, '0') : '';
   const dexRaw = dexNumber !== null ? String(dexNumber) : '';
@@ -264,6 +281,7 @@ function mapPokemon(raw) {
     favorites,
     favoritesNorm: setFrom(favorites),
     locations,
+    locationNormSet: setFrom(locations),
     searchText: [normalizeText(name), dexPadded, dexRaw, normalizeText(specialties.join(' ')), normalizeText(favorites.join(' '))].join('|'),
   };
 }
@@ -272,7 +290,16 @@ function buildPokemonLookup() {
   const lookup = new Map();
 
   for (const pokemon of state.sortedPokemon) {
-    const tokens = [pokemon.name, pokemon.label, pokemon.dexPadded, pokemon.dexRaw, `#${pokemon.dexPadded}`, `#${pokemon.dexRaw}`];
+    const tokens = [
+      pokemon.name,
+      pokemon.label,
+      pokemon.dexPadded,
+      pokemon.dexRaw,
+      `#${pokemon.dexPadded}`,
+      `#${pokemon.dexRaw}`,
+      `${pokemon.dexPadded} ${pokemon.name}`,
+      `${pokemon.dexRaw} ${pokemon.name}`,
+    ];
 
     for (const token of tokens) {
       const normalized = normalizeImportToken(token);
@@ -340,11 +367,7 @@ function getOwnedOnlyMode() {
 }
 
 function getImportanceRatio() {
-  const raw = Number.parseFloat(elements.importanceRatio.value);
-  if (!Number.isFinite(raw)) {
-    return 0;
-  }
-  return Math.max(-1, Math.min(1, raw));
+  return clampRatio(elements.importanceRatio.value);
 }
 
 function updateImportanceRatioLabel() {
@@ -352,11 +375,7 @@ function updateImportanceRatioLabel() {
 }
 
 function getAutoImportanceRatio() {
-  const raw = Number.parseFloat(elements.autoImportanceRatio.value);
-  if (!Number.isFinite(raw)) {
-    return 0;
-  }
-  return Math.max(-1, Math.min(1, raw));
+  return clampRatio(elements.autoImportanceRatio.value);
 }
 
 function updateAutoImportanceRatioLabel() {
@@ -542,15 +561,10 @@ function renderOverlapList(listEl, rows, emptyText) {
   }
 
   for (const row of rows) {
-    const item = document.createElement('li');
-    item.className = 'overlap-item';
-    item.innerHTML = `
-      <div class="overlap-top">
-        <strong>${row.label}</strong>
-        <span class="overlap-count">x${row.count}</span>
-      </div>
-      <div class="overlap-members">${row.members.join(', ')}</div>
-    `;
+    const item = createNode('li', { className: 'overlap-item' });
+    const top = createNode('div', { className: 'overlap-top' });
+    top.append(createNode('strong', { text: row.label }), createNode('span', { className: 'overlap-count', text: `x${row.count}` }));
+    item.append(top, createNode('div', { className: 'overlap-members', text: row.members.join(', ') }));
     listEl.appendChild(item);
   }
 }
@@ -568,6 +582,7 @@ function saveRequirements() {
   );
 
   writeStorage(STORAGE_KEYS.requirements, {
+    recommendationMap: elements.recommendationMap.value,
     requiredHabitat: elements.requiredHabitat.value,
     selectedSpecialties: checkedSpecialties,
     resultCount: elements.resultCount.value,
@@ -596,6 +611,9 @@ function restoreRequirements() {
 
   if (typeof saved.requiredHabitat === 'string') {
     elements.requiredHabitat.value = saved.requiredHabitat;
+  }
+  if (typeof saved.recommendationMap === 'string') {
+    elements.recommendationMap.value = canonicalizeMapName(saved.recommendationMap);
   }
   if (typeof saved.resultCount === 'string') {
     elements.resultCount.value = saved.resultCount;
@@ -656,15 +674,16 @@ function sanitizeHouse(raw) {
 
   return {
     id: typeof raw.id === 'string' && raw.id ? raw.id : `house-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-    name: String(raw.name || '').trim() || formatHouseNumber(state.houses.length + 1),
+    name: sanitizeFreeText(raw.name || '', 64) || formatHouseNumber(state.houses.length + 1),
     memberIds,
-    map: HOUSE_MAPS.includes(raw.map) ? raw.map : HOUSE_MAPS[0],
+    map: HOUSE_MAPS.includes(canonicalizeMapName(raw.map)) ? canonicalizeMapName(raw.map) : HOUSE_MAPS[0],
     stackedScore: Number.isFinite(raw.stackedScore) ? raw.stackedScore : 0,
     simpleScore: Number.isFinite(raw.simpleScore) ? raw.simpleScore : 0,
     rating: String(raw.rating || '').trim() || 'D',
     createdAt: String(raw.createdAt || new Date().toISOString()),
     source: raw.source === 'auto' || raw.source === 'edited' ? raw.source : 'manual',
     sizeRange: raw.sizeRange && typeof raw.sizeRange === 'object' ? raw.sizeRange : null,
+    importanceRatio: clampRatio(raw.importanceRatio),
     sequence: Number.isInteger(raw.sequence) && raw.sequence > 0 ? raw.sequence : state.houses.length + 1,
   };
 }
@@ -727,6 +746,7 @@ function populateRequirementSelects() {
   );
   elements.requiredHabitat.innerHTML = "<option value=''>Any habitat</option>";
   elements.autoRequiredHabitat.innerHTML = "<option value=''>Any habitat</option>";
+  elements.recommendationMap.innerHTML = "<option value=''>Any map</option>";
   for (const habitat of habitats) {
     const option = document.createElement('option');
     option.value = habitat;
@@ -734,6 +754,13 @@ function populateRequirementSelects() {
     elements.requiredHabitat.appendChild(option);
     elements.autoRequiredHabitat.appendChild(option.cloneNode(true));
   }
+
+  HOUSE_MAPS.forEach((map) => {
+    const option = document.createElement('option');
+    option.value = map;
+    option.textContent = map;
+    elements.recommendationMap.appendChild(option);
+  });
 
   const specialties = unique(state.sortedPokemon.flatMap((pokemon) => pokemon.specialties)).sort((a, b) => a.localeCompare(b));
   elements.requiredSpecialtiesBox.innerHTML = '';
@@ -776,6 +803,7 @@ function getSelectedSpecialtiesNormalized() {
 
 function getCurrentRequirements() {
   return {
+    targetMapNorm: normalizeText(elements.recommendationMap.value),
     requiredHabitatNorm: normalizeText(elements.requiredHabitat.value),
     requiredSpecialtiesNorm: getSelectedSpecialtiesNormalized(),
   };
@@ -862,17 +890,18 @@ function renderCatalogList() {
     const ownershipLabel = ownedSet.has(pokemon.id) ? (assignedSet.has(pokemon.id) ? 'In House' : 'Owned') : 'Not owned';
     const ownershipClass = ownedSet.has(pokemon.id) ? 'owned' : 'unowned';
 
-    const info = document.createElement('div');
-    info.className = 'catalog-item-body';
-    info.innerHTML = `
-      <div class="catalog-title-row">
-        <strong>${pokemon.label}</strong>
-        <span class="ownership-badge ${ownershipClass}">${ownershipLabel}</span>
-      </div>
-      <p><strong>Habitat:</strong> ${pokemon.idealHabitat || 'Unknown'}</p>
-      <p><strong>Specialties:</strong> ${listToText(pokemon.specialties)}</p>
-      <p><strong>Favorites:</strong> ${listToText(pokemon.favorites.slice(0, 3))}${pokemon.favorites.length > 3 ? ', …' : ''}</p>
-    `;
+    const info = createNode('div', { className: 'catalog-item-body' });
+    const titleRow = createNode('div', { className: 'catalog-title-row' });
+    titleRow.append(createNode('strong', { text: pokemon.label }), createBadge(`ownership-badge ${ownershipClass}`, ownershipLabel));
+    info.append(
+      titleRow,
+      createNode('p', { text: `Habitat: ${pokemon.idealHabitat || 'Unknown'}` }),
+      createNode('p', { text: `Specialties: ${listToText(pokemon.specialties)}` }),
+      createNode('p', {
+        text: `Favorites: ${listToText(pokemon.favorites.slice(0, 3))}${pokemon.favorites.length > 3 ? ', …' : ''}`,
+      }),
+      createNode('p', { className: 'hint tiny-text', text: buildMapHint(pokemon, elements.recommendationMap.value) }),
+    );
 
     card.appendChild(checkbox);
     card.appendChild(info);
@@ -1028,22 +1057,34 @@ function renderOwnedDex() {
   }
 
   for (const pokemon of filtered) {
-    const card = document.createElement('article');
-    card.className = 'owned-card';
-    card.innerHTML = `
-      <div class="owned-card-head">
-        <div>
-          <p class="owned-card-name">${pokemon.label}</p>
-          <p class="owned-card-meta">Habitat: ${pokemon.idealHabitat || 'Unknown'} · Specialties: ${listToText(pokemon.specialties)}</p>
-        </div>
-        <span class="ownership-badge owned">Available</span>
-      </div>
-      <p class="owned-card-favorites">Favorites: ${listToText(pokemon.favorites.slice(0, 4))}${pokemon.favorites.length > 4 ? ', …' : ''}</p>
-      <div class="owned-card-actions">
-        <button type="button" class="add-to-team" data-id="${pokemon.id}">Add to squad</button>
-        <button type="button" class="ghost remove-owned" data-id="${pokemon.id}">Remove from Pokédex</button>
-      </div>
-    `;
+    const card = createNode('article', { className: 'owned-card' });
+    const head = createNode('div', { className: 'owned-card-head' });
+    const textWrap = document.createElement('div');
+    textWrap.append(
+      createNode('p', { className: 'owned-card-name', text: pokemon.label }),
+      createNode('p', { className: 'owned-card-meta', text: `Habitat: ${pokemon.idealHabitat || 'Unknown'} · Specialties: ${listToText(pokemon.specialties)}` }),
+    );
+    head.append(textWrap, createBadge('ownership-badge owned', 'Available'));
+
+    const actions = createNode('div', { className: 'owned-card-actions' });
+    actions.append(
+      createNode('button', { className: 'add-to-team', text: 'Add to squad', attrs: { type: 'button', 'data-id': pokemon.id } }),
+      createNode('button', {
+        className: 'ghost remove-owned',
+        text: 'Remove from Pokédex',
+        attrs: { type: 'button', 'data-id': pokemon.id },
+      }),
+    );
+
+    card.append(
+      head,
+      createNode('p', {
+        className: 'owned-card-favorites',
+        text: `Favorites: ${listToText(pokemon.favorites.slice(0, 4))}${pokemon.favorites.length > 4 ? ', …' : ''}`,
+      }),
+      createNode('p', { className: 'hint tiny-text', text: buildMapHint(pokemon, elements.recommendationMap.value) }),
+      actions,
+    );
     elements.ownedDexList.appendChild(card);
   }
 }
@@ -1063,19 +1104,20 @@ function renderTeam() {
   }
 
   for (const member of members) {
-    const li = document.createElement('li');
-    li.className = 'team-item';
-    li.innerHTML = `
-      <div class="team-item-main">
-        <div class="team-item-top">
-          <strong>${member.label}</strong>
-          <span class="chip">${member.idealHabitat || 'Unknown habitat'}</span>
-        </div>
-        <p><strong>Specialties:</strong> ${listToText(member.specialties)}</p>
-        <p><strong>Favorites:</strong> ${listToText(member.favorites)}</p>
-      </div>
-      <button type="button" class="ghost remove-team" data-id="${member.id}">Remove</button>
-    `;
+    const li = createNode('li', { className: 'team-item' });
+    const main = createNode('div', { className: 'team-item-main' });
+    const top = createNode('div', { className: 'team-item-top' });
+    top.append(createNode('strong', { text: member.label }), createBadge('chip', member.idealHabitat || 'Unknown habitat'));
+    main.append(
+      top,
+      createNode('p', { text: `Specialties: ${listToText(member.specialties)}` }),
+      createNode('p', { text: `Favorites: ${listToText(member.favorites)}` }),
+      createNode('p', { className: 'hint tiny-text', text: buildMapHint(member, elements.houseMapInput.value || elements.recommendationMap.value) }),
+    );
+    li.append(
+      main,
+      createNode('button', { className: 'ghost remove-team', text: 'Remove', attrs: { type: 'button', 'data-id': member.id } }),
+    );
     elements.teamList.appendChild(li);
   }
 
@@ -1105,18 +1147,6 @@ function renderTeamInsights(groupMembers = getTeamMembers()) {
     : 'No shared favorites in the current squad.';
 
   return summary;
-}
-
-function candidateMatchesRequirements(candidate, requirements) {
-  if (requirements.requiredHabitatNorm && candidate.idealHabitatNorm !== requirements.requiredHabitatNorm) {
-    return false;
-  }
-
-  if (requirements.requiredSpecialtiesNorm.length > 0) {
-    return requirements.requiredSpecialtiesNorm.some((specialty) => candidate.specialtiesNorm.has(specialty));
-  }
-
-  return true;
 }
 
 function scoreCandidate(candidate, groupMembers, importanceRatio) {
@@ -1155,7 +1185,9 @@ function updateSpotlight(topRow) {
   elements.topRecommendationName.textContent = `${topRow.candidate.label} · ${topRow.owned ? 'Owned' : 'Unowned option'}`;
   elements.spotlightName.textContent = topRow.candidate.label;
   const sharedFavorites = topRow.sharedFavoriteNames.length ? topRow.sharedFavoriteNames.join(', ') : 'none';
-  elements.spotlightSummary.textContent = `${topRow.owned ? 'Owned' : 'Unowned'} · Habitat ${topRow.candidate.idealHabitat || 'Unknown'} · Favorites ${topRow.favoritesScore} · Shared ${sharedFavorites}`;
+  elements.spotlightSummary.textContent = `${topRow.owned ? 'Owned' : 'Unowned'} · Habitat ${
+    topRow.candidate.idealHabitat || 'Unknown'
+  } · Favorites ${topRow.favoritesScore} · Shared ${sharedFavorites} · ${buildMapHint(topRow.candidate, elements.recommendationMap.value)}`;
 }
 
 function runRecommendation() {
@@ -1169,6 +1201,21 @@ function runRecommendation() {
   const ownedOnly = getOwnedOnlyMode();
   const rows = [];
 
+  elements.resultsBody.innerHTML = '';
+  elements.recommendationsSection.classList.toggle('recommendations-awaiting-team', teamMembers.length === 0);
+
+  if (!teamMembers.length) {
+    state.lastRecommendationRows = [];
+    elements.resultsBody.innerHTML =
+      '<tr><td colspan="11" class="table-empty">Add at least one Pokémon to the active squad to generate recommendations.</td></tr>';
+    updateSpotlight(null);
+    renderTeamInsights(teamMembers);
+    updateDashboard(null, 0);
+    elements.status.textContent = 'Recommendations are waiting for an active squad.';
+    saveRequirements();
+    return;
+  }
+
   for (const candidate of state.sortedPokemon) {
     if (!eligibleSet.has(candidate.id) || teamSet.has(candidate.id)) {
       continue;
@@ -1176,7 +1223,7 @@ function runRecommendation() {
     if (ownedOnly && !ownedSet.has(candidate.id)) {
       continue;
     }
-    if (!candidateMatchesRequirements(candidate, requirements)) {
+    if (!matchesRequirements(candidate, requirements)) {
       continue;
     }
 
@@ -1207,27 +1254,41 @@ function runRecommendation() {
 
   state.lastRecommendationRows = rows;
   const topRows = rows.slice(0, limit);
-  elements.resultsBody.innerHTML = '';
 
   if (!topRows.length) {
-    elements.resultsBody.innerHTML = '<tr><td colspan="10" class="table-empty">No recommendations match the current filters.</td></tr>';
+    elements.resultsBody.innerHTML = '<tr><td colspan="11" class="table-empty">No recommendations match the current filters.</td></tr>';
   }
 
   for (const [index, row] of topRows.entries()) {
     const actionLabel = row.owned ? 'Add to squad' : 'Add to Pokédex';
     const tr = document.createElement('tr');
-    tr.innerHTML = `
-      <td data-label="Rank">${index + 1}</td>
-      <td data-label="Pokémon">${row.candidate.label}</td>
-      <td data-label="Ownership"><span class="ownership-badge ${row.owned ? 'owned' : 'unowned'}">${row.owned ? 'Owned' : 'Unowned'}</span></td>
-      <td data-label="Habitat">${row.candidate.idealHabitat || 'Unknown'}</td>
-      <td data-label="Combined"><strong>${row.combinedScore.toFixed(2)}</strong></td>
-      <td data-label="Habitat">${row.habitatScore}</td>
-      <td data-label="Favorites">${row.favoritesScore}</td>
-      <td data-label="Shared favorites">${row.sharedFavoriteNames.length ? row.sharedFavoriteNames.join(', ') : '—'}</td>
-      <td data-label="Specialties">${listToText(row.candidate.specialties)}</td>
-      <td data-label="Action"><button type="button" class="tiny recommendation-action" data-id="${row.candidate.id}" data-owned="${row.owned}">${actionLabel}</button></td>
-    `;
+    const cells = [
+      createNode('td', { text: String(index + 1), attrs: { 'data-label': 'Rank' } }),
+      createNode('td', { text: row.candidate.label, attrs: { 'data-label': 'Pokémon' } }),
+      createNode('td', { attrs: { 'data-label': 'Ownership' } }),
+      createNode('td', { text: row.candidate.idealHabitat || 'Unknown', attrs: { 'data-label': 'Habitat' } }),
+      createNode('td', { attrs: { 'data-label': 'Combined' } }),
+      createNode('td', { text: String(row.habitatScore), attrs: { 'data-label': 'Habitat score' } }),
+      createNode('td', { text: String(row.favoritesScore), attrs: { 'data-label': 'Favorites score' } }),
+      createNode('td', {
+        text: row.sharedFavoriteNames.length ? row.sharedFavoriteNames.join(', ') : '—',
+        attrs: { 'data-label': 'Shared favorites' },
+      }),
+      createNode('td', { text: listToText(row.candidate.specialties), attrs: { 'data-label': 'Specialties' } }),
+      createNode('td', { text: buildMapHint(row.candidate, elements.recommendationMap.value), attrs: { 'data-label': 'Map availability' } }),
+      createNode('td', { attrs: { 'data-label': 'Action' } }),
+    ];
+
+    cells[2].append(createBadge(`ownership-badge ${row.owned ? 'owned' : 'unowned'}`, row.owned ? 'Owned' : 'Unowned'));
+    cells[4].append(createNode('strong', { text: row.combinedScore.toFixed(2) }));
+    cells[10].append(
+      createNode('button', {
+        className: 'tiny recommendation-action',
+        text: actionLabel,
+        attrs: { type: 'button', 'data-id': row.candidate.id, 'data-owned': row.owned },
+      }),
+    );
+    tr.append(...cells);
     elements.resultsBody.appendChild(tr);
   }
 
@@ -1262,15 +1323,16 @@ function createHouseRecord({ name, memberIds, source, sizeRange, map, importance
   state.houseCounter += 1;
   return {
     id: `house-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-    name: String(name || '').trim() || buildDefaultHouseName(),
+    name: sanitizeFreeText(name || '', 64) || buildDefaultHouseName(),
     memberIds: [...memberIds],
-    map,
+    map: canonicalizeMapName(map),
     stackedScore: summary.stackedCombined,
     simpleScore: summary.simpleCombined,
     rating: buildHouseRating(summary),
     createdAt: new Date().toISOString(),
     source,
     sizeRange: sizeRange || null,
+    importanceRatio,
     sequence: state.houseCounter,
   };
 }
@@ -1298,9 +1360,19 @@ function saveCurrentTeamAsHouse() {
     return;
   }
 
-  const selectedMap = elements.houseMapInput.value;
+  const selectedMap = canonicalizeMapName(elements.houseMapInput.value);
   if (!HOUSE_MAPS.includes(selectedMap)) {
     elements.houseSaveFeedback.textContent = 'Choose a House map before saving.';
+    return;
+  }
+
+  const offMapMembers = memberIds
+    .map((id) => state.pokemonById.get(id))
+    .filter((pokemon) => pokemon && !pokemon.locationNormSet.has(normalizeText(selectedMap)));
+  if (offMapMembers.length) {
+    elements.houseSaveFeedback.textContent = `These squad members are not available on ${selectedMap}: ${offMapMembers
+      .map((pokemon) => pokemon.name)
+      .join(', ')}.`;
     return;
   }
 
@@ -1309,6 +1381,7 @@ function saveCurrentTeamAsHouse() {
     memberIds,
     source: state.editingHouseId ? 'edited' : 'manual',
     map: selectedMap,
+    importanceRatio: getImportanceRatio(),
   });
 
   state.houses.unshift(house);
@@ -1365,10 +1438,12 @@ function editHouseById(id) {
   state.editingHouseId = house.id;
   elements.houseNameInput.value = house.name || '';
   elements.houseMapInput.value = house.map || HOUSE_MAPS[0];
+  elements.importanceRatio.value = String(clampRatio(house.importanceRatio));
+  updateImportanceRatioLabel();
   saveHouses();
   saveTeamIds();
   refreshAllViews();
-  elements.houseSaveFeedback.textContent = `${getHouseDisplayName(house)} moved back into the active squad. Adjust members, then save it again.`;
+  elements.houseSaveFeedback.textContent = `${getHouseDisplayName(house)} moved back into the active squad with its saved weighting restored. Adjust members, then save it again.`;
   setMobileSection('squad', { scroll: true });
 }
 
@@ -1409,14 +1484,16 @@ function isBetterHouseCandidate(candidate, incumbent) {
   return compareHouseCandidates(candidate, incumbent) < 0;
 }
 
-function getFilteredAutoHousePool(requirements) {
+function getFilteredAutoHousePool(requirements, targetMap = '') {
+  const targetMapNorm = normalizeText(targetMap);
   return getAvailableOwnedPokemon()
     .filter((pokemon) => !state.teamIds.includes(pokemon.id))
-    .filter((pokemon) => candidateMatchesRequirements(pokemon, requirements));
+    .filter((pokemon) => matchesRequirements(pokemon, requirements))
+    .filter((pokemon) => !targetMapNorm || pokemon.locationNormSet.has(targetMapNorm));
 }
 
-function generateBestHouseFromRange(minSize, maxSize, requirements, importanceRatio) {
-  const availablePool = getFilteredAutoHousePool(requirements);
+function generateBestHouseFromRange(minSize, maxSize, requirements, importanceRatio, targetMap = '') {
+  const availablePool = getFilteredAutoHousePool(requirements, targetMap);
   if (availablePool.length < minSize) {
     return null;
   }
@@ -1498,7 +1575,7 @@ function normalizeAutoHouseRange() {
 
 function generateAutoHouse() {
   const { minSize, maxSize, availableCount } = normalizeAutoHouseRange();
-  const selectedMap = elements.autoHouseMap.value;
+  const selectedMap = canonicalizeMapName(elements.autoHouseMap.value);
   const requirements = getCurrentAutoRequirements();
   const importanceRatio = getAutoImportanceRatio();
 
@@ -1507,7 +1584,7 @@ function generateAutoHouse() {
     return;
   }
 
-  const filteredPoolCount = getFilteredAutoHousePool(requirements).length;
+  const filteredPoolCount = getFilteredAutoHousePool(requirements, selectedMap).length;
   if (filteredPoolCount < minSize) {
     elements.autoHouseFeedback.textContent = `At least ${minSize} unassigned owned Pokémon must match the current auto-create filters.`;
     return;
@@ -1518,7 +1595,7 @@ function generateAutoHouse() {
     return;
   }
 
-  const best = generateBestHouseFromRange(minSize, maxSize, requirements, importanceRatio);
+  const best = generateBestHouseFromRange(minSize, maxSize, requirements, importanceRatio, selectedMap);
   if (!best) {
     elements.autoHouseFeedback.textContent = 'No valid House could be generated from the current available pool.';
     return;
@@ -1555,55 +1632,53 @@ function renderHouses() {
 
   for (const house of state.houses) {
     const members = getHouseMembers(house);
-    const article = document.createElement('article');
-    article.className = 'house-card';
-    article.innerHTML = `
-      <div class="house-card-top">
-        <div>
-          <p class="house-card-kicker">${getHouseSourceLabel(house)}</p>
-          <h3>${getHouseDisplayName(house)}</h3>
-        </div>
-        <div class="house-badge-stack">
-          <span class="rating-badge">Rating ${house.rating}</span>
-          <span class="pill">${members.length} Pokémon</span>
-        </div>
-      </div>
+    const article = createNode('article', { className: 'house-card' });
+    const top = createNode('div', { className: 'house-card-top' });
+    const titleWrap = document.createElement('div');
+    titleWrap.append(
+      createNode('p', { className: 'house-card-kicker', text: getHouseSourceLabel(house) }),
+      createNode('h3', { text: getHouseDisplayName(house) }),
+    );
+    const badges = createNode('div', { className: 'house-badge-stack' });
+    badges.append(createBadge('rating-badge', `Rating ${house.rating}`), createBadge('pill', `${members.length} Pokémon`));
+    top.append(titleWrap, badges);
 
-      <div class="house-score-grid">
-        <div class="score-chip">
-          <span>Map</span>
-          <strong>${house.map}</strong>
-        </div>
-        <div class="score-chip">
-          <span>Stacked synergy</span>
-          <strong>${house.stackedScore.toFixed(2)}</strong>
-        </div>
-        <div class="score-chip">
-          <span>Simple synergy</span>
-          <strong>${house.simpleScore.toFixed(2)}</strong>
-        </div>
-      </div>
+    const scoreGrid = createNode('div', { className: 'house-score-grid' });
+    [
+      ['Map', house.map],
+      ['Stacked synergy', house.stackedScore.toFixed(2)],
+      ['Simple synergy', house.simpleScore.toFixed(2)],
+      ['Weighting', house.importanceRatio.toFixed(2)],
+    ].forEach(([label, value]) => {
+      const chip = createNode('div', { className: 'score-chip' });
+      chip.append(createNode('span', { text: label }), createNode('strong', { text: value }));
+      scoreGrid.appendChild(chip);
+    });
 
-      <p class="hint tiny-text">${house.sizeRange ? `Generated with a size range of ${house.sizeRange.min}-${house.sizeRange.max}. ` : ''}Created ${new Date(house.createdAt).toLocaleString()}.</p>
+    const metaParts = [];
+    if (house.sizeRange) {
+      metaParts.push(`Generated with a size range of ${house.sizeRange.min}-${house.sizeRange.max}.`);
+    }
+    metaParts.push(`Created ${new Date(house.createdAt).toLocaleString()}.`);
+    metaParts.push(`Weighting ${house.importanceRatio >= 0 ? 'leans favorites' : 'leans habitat'}.`);
 
-      <ul class="house-member-list">
-        ${members
-          .map(
-            (member) => `
-            <li>
-              <strong>${member.label}</strong>
-              <span>${member.idealHabitat || 'Unknown habitat'}</span>
-            </li>
-          `,
-          )
-          .join('')}
-      </ul>
+    const memberList = createNode('ul', { className: 'house-member-list' });
+    members.forEach((member) => {
+      const item = document.createElement('li');
+      item.append(
+        createNode('strong', { text: member.label }),
+        createNode('span', { text: `${member.idealHabitat || 'Unknown habitat'} · ${buildMapHint(member, house.map)}` }),
+      );
+      memberList.appendChild(item);
+    });
 
-      <div class="inline-actions wrap-start">
-        <button type="button" class="ghost edit-house" data-id="${house.id}">Edit as active squad</button>
-        <button type="button" class="ghost release-house" data-id="${house.id}">Release House</button>
-      </div>
-    `;
+    const actions = createNode('div', { className: 'inline-actions wrap-start' });
+    actions.append(
+      createNode('button', { className: 'ghost edit-house', text: 'Edit as active squad', attrs: { type: 'button', 'data-id': house.id } }),
+      createNode('button', { className: 'ghost release-house', text: 'Release House', attrs: { type: 'button', 'data-id': house.id } }),
+    );
+
+    article.append(top, scoreGrid, createNode('p', { className: 'hint tiny-text', text: metaParts.join(' ') }), memberList, actions);
     elements.houseList.appendChild(article);
   }
 }
@@ -1638,14 +1713,18 @@ function updateDashboard(topRow, totalMatches) {
   } else if (!availableCount && !teamCount) {
     elements.plannerInsight.textContent = 'All owned Pokémon are currently locked into Houses.';
   } else if (!teamCount) {
-    elements.plannerInsight.textContent = 'Choose available Pokémon for the active squad, or auto-generate a House.';
+    elements.plannerInsight.textContent = 'Choose available Pokémon for the active squad before relying on recommendations.';
   } else {
     elements.plannerInsight.textContent = `${totalMatches} candidates match the current filters for the active squad.`;
   }
 
-  if (!topRow) {
+  if (!topRow || !teamCount) {
     elements.topRecommendationScore.textContent = '—';
-    elements.topRecommendationName.textContent = ownedCount ? 'No recommendation matches filters' : 'Add Pokémon to begin';
+    elements.topRecommendationName.textContent = !teamCount
+      ? 'Build an active squad to unlock recommendations'
+      : ownedCount
+        ? 'No recommendation matches filters'
+        : 'Add Pokémon to begin';
   }
 }
 
@@ -1658,28 +1737,7 @@ function refreshAllViews() {
 }
 
 function parseImportText(text) {
-  const lines = String(text ?? '')
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter(Boolean);
-
-  const matchedIds = [];
-  const missing = [];
-
-  for (const line of lines) {
-    const id = state.pokemonLookup.get(normalizeImportToken(line));
-    if (id) {
-      matchedIds.push(id);
-    } else {
-      missing.push(line);
-    }
-  }
-
-  return {
-    lines,
-    matchedIds: unique(matchedIds),
-    missing,
-  };
+  return parseImportTextFromLookup(text, state.pokemonLookup);
 }
 
 function importPokemonListFromText(text) {
@@ -1690,14 +1748,20 @@ function importPokemonListFromText(text) {
     return;
   }
 
+  const alreadyOwned = matchedIds.filter((id) => state.ownedIds.includes(id)).length;
   const added = addOwnedPokemonByIds(matchedIds);
-  const parts = [`Read ${lines.length} lines.`, `Added ${added} Pokémon to your owned list.`];
+  const parts = [`Read ${lines.length} lines.`, `Matched ${matchedIds.length} Pokémon.`, `Added ${added} new Pokémon.`];
+
+  if (alreadyOwned) {
+    parts.push(`${alreadyOwned} were already in your owned list.`);
+  }
 
   if (missing.length) {
-    parts.push(`Could not match: ${missing.join(', ')}.`);
+    const preview = missing.slice(0, 5).join(', ');
+    parts.push(`Could not match: ${preview}${missing.length > 5 ? `, +${missing.length - 5} more` : ''}.`);
   }
   if (!matchedIds.length) {
-    parts.push('Use an exact Pokémon name or dex number on each line.');
+    parts.push('Try names, dex numbers, bullet lists, or lines like "#025 Pikachu".');
   }
 
   elements.importFeedback.textContent = parts.join(' ');
@@ -1872,6 +1936,7 @@ function bindEvents() {
   });
 
   elements.ownedOnlyToggle.addEventListener('change', runRecommendation);
+  elements.recommendationMap.addEventListener('change', refreshAllViews);
   elements.requiredHabitat.addEventListener('change', runRecommendation);
   elements.resultCount.addEventListener('change', runRecommendation);
   elements.importanceRatio.addEventListener('input', () => {
@@ -1904,6 +1969,9 @@ function bindEvents() {
   });
   [elements.autoHouseMin, elements.autoHouseMax].forEach((input) => {
     input.addEventListener('change', normalizeAutoHouseRange);
+  });
+  [elements.houseMapInput, elements.autoHouseMap].forEach((input) => {
+    input.addEventListener('change', refreshAllViews);
   });
 
   elements.resultsBody.addEventListener('click', (event) => {
