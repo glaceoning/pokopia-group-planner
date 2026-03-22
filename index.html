@@ -97,12 +97,12 @@
 
       <nav class="mobile-section-nav" aria-label="Mobile sections">
         <p class="mobile-section-hint">Quick mobile navigation</p>
-        <div class="mobile-section-track">
-          <button type="button" class="mobile-section-button is-active" data-mobile-target="overview">Overview</button>
-          <button type="button" class="mobile-section-button" data-mobile-target="import">Import</button>
-          <button type="button" class="mobile-section-button" data-mobile-target="squad">Squad</button>
-          <button type="button" class="mobile-section-button" data-mobile-target="houses">Houses</button>
-          <button type="button" class="mobile-section-button" data-mobile-target="recommendations">Recommendations</button>
+        <div class="mobile-section-track" role="tablist" aria-label="Planner sections">
+          <button type="button" class="mobile-section-button is-active" data-mobile-target="overview" role="tab" aria-selected="true" aria-controls="overviewSection">Overview</button>
+          <button type="button" class="mobile-section-button" data-mobile-target="import" role="tab" aria-selected="false" aria-controls="importSection">Import</button>
+          <button type="button" class="mobile-section-button" data-mobile-target="squad" role="tab" aria-selected="false" aria-controls="workspaceSection">Squad</button>
+          <button type="button" class="mobile-section-button" data-mobile-target="houses" role="tab" aria-selected="false" aria-controls="housesSection">Houses</button>
+          <button type="button" class="mobile-section-button" data-mobile-target="recommendations" role="tab" aria-selected="false" aria-controls="recommendationsSection">Recommendations</button>
         </div>
       </nav>
 
@@ -255,11 +255,12 @@
                 <span>House map</span>
                 <select id="houseMapInput">
                   <option value="">Select a map</option>
-                  <option value="Withered Wasteland">Withered Wasteland</option>
+                  <option value="Withered Wastelands">Withered Wastelands</option>
                   <option value="Bleak Beach">Bleak Beach</option>
                   <option value="Rocky Ridges">Rocky Ridges</option>
                   <option value="Sparkling Skylands">Sparkling Skylands</option>
-                  <option value="Pallette Town">Pallette Town</option>
+                  <option value="Palette Town">Palette Town</option>
+                  <option value="Cloud Island">Cloud Island</option>
                 </select>
               </label>
               <button id="saveHouse" type="button">Save House</button>
@@ -314,11 +315,12 @@
                 <span>House map</span>
                 <select id="autoHouseMap">
                   <option value="">Select a map</option>
-                  <option value="Withered Wasteland">Withered Wasteland</option>
+                  <option value="Withered Wastelands">Withered Wastelands</option>
                   <option value="Bleak Beach">Bleak Beach</option>
                   <option value="Rocky Ridges">Rocky Ridges</option>
                   <option value="Sparkling Skylands">Sparkling Skylands</option>
-                  <option value="Pallette Town">Pallette Town</option>
+                  <option value="Palette Town">Palette Town</option>
+                  <option value="Cloud Island">Cloud Island</option>
                 </select>
               </label>
 
@@ -445,6 +447,11 @@
               <select id="requiredHabitat"></select>
             </label>
 
+            <label class="field" for="recommendationMap">
+              <span>Target map</span>
+              <select id="recommendationMap"></select>
+            </label>
+
             <div class="field collapsible-card collapsed" id="specialtiesCard">
               <div class="field-head">
                 <span>Specialties</span>
@@ -495,6 +502,7 @@
             <article class="panel card-surface">
               <div class="table-wrap">
                 <table>
+                  <caption class="sr-only">Recommendation scores for candidates that fit the current active squad, filters, and target map.</caption>
                   <thead>
                     <tr>
                       <th>Rank</th>
@@ -502,10 +510,11 @@
                       <th>Ownership</th>
                       <th>Habitat</th>
                       <th>Combined</th>
-                      <th>Habitat</th>
-                      <th>Favorites</th>
+                      <th>Habitat score</th>
+                      <th>Favorites score</th>
                       <th>Shared favorites</th>
                       <th>Specialties</th>
+                      <th>Map availability</th>
                       <th>Action</th>
                     </tr>
                   </thead>
